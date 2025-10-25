@@ -34,7 +34,7 @@ RUN mage proto && \
     mkdir -p bin && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build \
-    -ldflags "-X 'github.com/pharmalytica/hermes/version.Version=${VERSION}' -X 'github.com/pharmalytica/hermes/version.GitCommit=${GIT_COMMIT}' -X 'github.com/pharmalytica/hermes/version.BuildDate=${BUILD_DATE}'" \
+    -ldflags="-X github.com/pharmalytica/hermes/version.Version=${VERSION} -X github.com/pharmalytica/hermes/version.GitCommit=${GIT_COMMIT} -X github.com/pharmalytica/hermes/version.BuildDate=${BUILD_DATE}" \
     -o bin/hermes \
     ./cmd/hermes
 

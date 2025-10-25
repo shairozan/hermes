@@ -17,7 +17,8 @@
       "Bash(go clean:*)",
       "Bash(find:*)",
       "Bash(mage build:*)",
-      "Bash(mage clean:*)"
+      "Bash(mage clean:*)",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": []
