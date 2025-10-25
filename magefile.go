@@ -160,3 +160,12 @@ func Install() error {
 
 	return nil
 }
+
+// Validate generates validation report by scanning tests for requirement mappings
+func Validate() error {
+	mg.Deps(Proto)
+	fmt.Println("Generating validation report...")
+
+	// Run the validation report generator
+	return sh.RunV("go", "run", "./cmd/validate")
+}

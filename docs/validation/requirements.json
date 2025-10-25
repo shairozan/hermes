@@ -1,0 +1,438 @@
+{
+  "metadata": {
+    "product": "Hermes - Cloud-Native HPC Command Proxy",
+    "version": "0.1.0",
+    "purpose": "CFR 21 Part 11 Compliance - GAMP 5 Validation",
+    "status": "Active Development",
+    "gamp_classification": "Category 4 (Configured Product)",
+    "last_updated": "2025-01-25"
+  },
+  "categories": {
+    "EXE": "Command Execution",
+    "FILE": "File Management",
+    "AUD": "Audit Trail & Traceability",
+    "SEC": "Security & Access Control",
+    "VAL": "Validation & Verification",
+    "CFG": "Configuration Management",
+    "ERR": "Error Handling"
+  },
+  "requirements": [
+    {
+      "id": "REQ-EXE-LOC-001",
+      "title": "Local Command Execution",
+      "category": "EXE",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL execute commands directly on the host filesystem when configured in local mode.",
+      "rationale": "Provides lightweight execution environment for development and testing without Docker dependency.",
+      "acceptance_criteria": [
+        "System creates isolated workspace directory per execution",
+        "Command executes with specified arguments",
+        "Command inherits environment variables from request",
+        "Exit code captured and reported"
+      ],
+      "test_strategy": "Integration test with known commands",
+      "risk": "Medium",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-EXE-LOC-002",
+      "title": "Workspace Isolation",
+      "category": "EXE",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL create a unique, isolated workspace directory for each execution using the execution ID.",
+      "rationale": "Prevents cross-contamination between executions and enables audit trail correlation.",
+      "acceptance_criteria": [
+        "Workspace path: {workspace_base}/{execution_id}/",
+        "Execution ID used for directory name",
+        "Directory created before file injection",
+        "Directory isolated from other executions"
+      ],
+      "test_strategy": "Execute multiple concurrent requests, verify separate workspaces",
+      "risk": "High",
+      "cfr_link": "§11.10(a)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-EXE-LOC-003",
+      "title": "Execution ID Generation",
+      "category": "EXE",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL generate a unique execution ID using UUID v4 if not provided by client.",
+      "rationale": "Ensures every execution has a unique identifier for audit trail correlation.",
+      "acceptance_criteria": [
+        "If execution_id provided in request, use it",
+        "If execution_id empty, generate UUID v4",
+        "ID must be filesystem-safe (no ., /, ..)",
+        "ID returned in all execution events"
+      ],
+      "test_strategy": "Test with client-provided ID, empty ID (auto-generation), and invalid ID rejection",
+      "risk": "Critical",
+      "cfr_link": "§11.10(e)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-EXE-LOC-004",
+      "title": "Output Streaming",
+      "category": "EXE",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL stream stdout and stderr from executing commands in real-time to the client.",
+      "rationale": "Provides immediate feedback and enables monitoring of long-running executions.",
+      "acceptance_criteria": [
+        "Stdout lines streamed as EventStdout events",
+        "Stderr lines streamed as EventStderr events",
+        "Line numbers sequential and accurate",
+        "No line loss or reordering"
+      ],
+      "test_strategy": "Execute command with known output, verify all lines received",
+      "risk": "Medium",
+      "cfr_link": "§11.10(a)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-FILE-LOC-001",
+      "title": "File Injection",
+      "category": "FILE",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL write all files from the execution request to the workspace directory before command execution.",
+      "rationale": "Enables self-contained execution with all required input files.",
+      "acceptance_criteria": [
+        "Files written to {workspace}/{relative_path}",
+        "File content matches request bytes exactly",
+        "Parent directories created as needed",
+        "Files written atomically (all or none)"
+      ],
+      "test_strategy": "Inject known files, verify content and paths",
+      "risk": "Critical",
+      "cfr_link": "§11.10(a)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-FILE-LOC-002",
+      "title": "Path Traversal Prevention",
+      "category": "FILE",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL reject any file paths that attempt directory traversal (e.g., ../, absolute paths).",
+      "rationale": "Prevents security vulnerability and data contamination outside workspace.",
+      "acceptance_criteria": [
+        "Paths containing .. rejected with error",
+        "Absolute paths rejected with error",
+        "Paths resolved relative to workspace only",
+        "Execution fails immediately on invalid path"
+      ],
+      "test_strategy": "Attempt injection with ../etc/passwd and /etc/passwd, verify rejection",
+      "risk": "Critical",
+      "cfr_link": "§11.10(d)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-FILE-LOC-003",
+      "title": "Artifact Collection",
+      "category": "FILE",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL collect files matching retain patterns using glob matching after command execution.",
+      "rationale": "Enables retrieval of execution results for analysis and archival.",
+      "acceptance_criteria": [
+        "Glob patterns evaluated against workspace contents",
+        "Matching files streamed as FileChunk events",
+        "File content transmitted completely",
+        "File count reported in completion event"
+      ],
+      "test_strategy": "Create files matching patterns, verify all matches collected and non-matches ignored",
+      "risk": "High",
+      "cfr_link": "§11.10(c)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-FILE-LOC-004",
+      "title": "Workspace Cleanup",
+      "category": "FILE",
+      "priority": "Medium",
+      "gamp_category": "Non-GxP",
+      "description": "The system SHALL remove workspace directory after execution if no retain patterns specified.",
+      "rationale": "Prevents disk space exhaustion from temporary workspaces.",
+      "acceptance_criteria": [
+        "If retain empty, workspace deleted after execution",
+        "If retain specified, workspace preserved",
+        "Cleanup happens after artifact collection",
+        "Cleanup failure logged but doesn't fail execution"
+      ],
+      "test_strategy": "Execute without retain (verify cleanup) and with retain (verify preservation)",
+      "risk": "Low",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-AUD-LOC-001",
+      "title": "Execution Event Correlation",
+      "category": "AUD",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL include the execution ID in every execution event streamed to the client.",
+      "rationale": "Enables correlation of all events back to the initiating request and audit entry.",
+      "acceptance_criteria": [
+        "execution_id field populated in every ExecutionEvent",
+        "ID consistent across all events for single execution",
+        "ID matches request execution_id or generated UUID"
+      ],
+      "test_strategy": "Execute and verify all events contain same execution ID",
+      "risk": "Critical",
+      "cfr_link": "§11.10(e)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-AUD-LOC-002",
+      "title": "Timestamping",
+      "category": "AUD",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL include Unix epoch timestamp in every execution event.",
+      "rationale": "Provides chronological record of execution activities.",
+      "acceptance_criteria": [
+        "timestamp field populated in every ExecutionEvent",
+        "Timestamp reflects event occurrence time",
+        "Timestamps monotonically increasing (or equal) within execution"
+      ],
+      "test_strategy": "Verify timestamps present and chronological",
+      "risk": "Critical",
+      "cfr_link": "§11.10(e)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-AUD-LOC-003",
+      "title": "Command Traceability",
+      "category": "AUD",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL log the actual command executed, including any overrides applied.",
+      "rationale": "Audit trail must show what actually executed, not just what was requested.",
+      "acceptance_criteria": [
+        "Original command from request logged",
+        "Overridden command logged if override applied",
+        "Override pattern and target logged",
+        "Execution ID links command to events"
+      ],
+      "test_strategy": "Execute with command override, verify both original and actual command logged",
+      "risk": "Critical",
+      "cfr_link": "§11.10(e)",
+      "implementation_status": "partial",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-AUD-LOC-004",
+      "title": "Execution Completion Recording",
+      "category": "AUD",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL report execution completion with exit code, runtime, and files collected.",
+      "rationale": "Provides definitive record of execution outcome.",
+      "acceptance_criteria": [
+        "ExecutionComplete event sent on success",
+        "Exit code captured from process",
+        "Runtime in seconds calculated and reported",
+        "File count accurate"
+      ],
+      "test_strategy": "Execute successful command (verify exit code 0) and failing command (verify non-zero)",
+      "risk": "Critical",
+      "cfr_link": "§11.10(a)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-CFG-LOC-001",
+      "title": "Mode Selection",
+      "category": "CFG",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL support selection of executor mode via configuration or command-line flag.",
+      "rationale": "Enables deployment-specific execution strategies.",
+      "acceptance_criteria": [
+        "executor.mode in YAML config honored",
+        "--mode flag overrides config",
+        "Valid modes: local, docker, file-server, scheduler",
+        "Invalid mode causes startup failure"
+      ],
+      "test_strategy": "Start with each valid mode, attempt invalid mode and verify error",
+      "risk": "Medium",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-CFG-LOC-002",
+      "title": "Workspace Base Configuration",
+      "category": "CFG",
+      "priority": "Medium",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL allow configuration of workspace base directory.",
+      "rationale": "Enables control over workspace location for disk space and access control.",
+      "acceptance_criteria": [
+        "executor.local.workspace_base in config honored",
+        "--workspace flag overrides config",
+        "Empty value defaults to system temp directory",
+        "Invalid directory causes startup failure"
+      ],
+      "test_strategy": "Configure custom workspace, verify usage",
+      "risk": "Medium",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-CFG-LOC-003",
+      "title": "Configuration Validation",
+      "category": "CFG",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL validate configuration at startup and fail fast on errors.",
+      "rationale": "Prevents operation with invalid configuration.",
+      "acceptance_criteria": [
+        "Invalid executor mode rejected",
+        "Invalid port rejected",
+        "Path traversal in overrides rejected",
+        "Validation errors descriptive"
+      ],
+      "test_strategy": "Provide invalid config, verify rejection",
+      "risk": "High",
+      "cfr_link": "§11.10(a)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-SEC-LOC-001",
+      "title": "Command Execution Isolation",
+      "category": "SEC",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL execute commands with the same user permissions as the server process.",
+      "rationale": "Local mode does not provide additional isolation; documentation and access control required.",
+      "acceptance_criteria": [
+        "Command executes as server user",
+        "No privilege escalation",
+        "No additional sandboxing applied",
+        "Documented security limitation"
+      ],
+      "test_strategy": "Execute command, verify process owner",
+      "risk": "Critical",
+      "cfr_link": "§11.10(d)",
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-SEC-LOC-002",
+      "title": "Path Sanitization",
+      "category": "SEC",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL sanitize all file paths to prevent directory traversal.",
+      "rationale": "Prevents unauthorized file access or modification.",
+      "acceptance_criteria": [
+        "Paths cleaned with filepath.Clean()",
+        "Relative path validation",
+        "Path traversal sequences rejected",
+        "Validation before any file operations"
+      ],
+      "test_strategy": "See REQ-FILE-LOC-002",
+      "risk": "Critical",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-ERR-LOC-001",
+      "title": "Execution Errors",
+      "category": "ERR",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL report execution errors via ExecutionError event with descriptive message.",
+      "rationale": "Client must know when execution fails and why.",
+      "acceptance_criteria": [
+        "Command not found → error event",
+        "Permission denied → error event",
+        "File injection failure → error event",
+        "Error message descriptive and actionable"
+      ],
+      "test_strategy": "Execute non-existent command, inject file to read-only location, verify error events",
+      "risk": "Medium",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-ERR-LOC-002",
+      "title": "Graceful Degradation",
+      "category": "ERR",
+      "priority": "Medium",
+      "gamp_category": "Non-GxP",
+      "description": "The system SHALL continue artifact collection even if command exits with non-zero code.",
+      "rationale": "Partial results may still be valuable for diagnostics.",
+      "acceptance_criteria": [
+        "Non-zero exit code doesn't prevent artifact collection",
+        "Artifacts collected and streamed normally",
+        "Completion event includes actual exit code"
+      ],
+      "test_strategy": "Execute failing command, verify artifacts collected",
+      "risk": "Low",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-VAL-ALL-001",
+      "title": "Test Traceability",
+      "category": "VAL",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL provide mechanism to trace tests back to requirements.",
+      "rationale": "Enables validation documentation and requirement coverage analysis.",
+      "acceptance_criteria": [
+        "Test metadata includes requirement ID",
+        "Test names indicate requirement",
+        "Coverage report shows requirement mapping",
+        "Automated validation test suite"
+      ],
+      "test_strategy": "Review test codebase for metadata",
+      "risk": "High",
+      "cfr_link": "§11.10(a)",
+      "implementation_status": "in_progress",
+      "test_status": "pending"
+    },
+    {
+      "id": "REQ-VAL-ALL-002",
+      "title": "Test Boundaries",
+      "category": "VAL",
+      "priority": "Medium",
+      "gamp_category": "GxP Critical",
+      "description": "Tests SHALL validate that commands are called correctly without executing actual computations.",
+      "rationale": "Per CLAUDE.md: Boundaries for most testing should limit to 'Are we calling the correct thing'",
+      "acceptance_criteria": [
+        "Unit tests verify command construction",
+        "Integration tests verify command invocation",
+        "Black box tests verify file content requirements",
+        "Actual computation not tested (external to Hermes)"
+      ],
+      "test_strategy": "Mock command execution where appropriate",
+      "risk": "Medium",
+      "cfr_link": null,
+      "implementation_status": "in_progress",
+      "test_status": "pending"
+    }
+  ]
+}

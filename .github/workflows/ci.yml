@@ -1,0 +1,373 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Install mage
+        run: go install github.com/magefile/mage@latest
+
+      - name: Generate protobuf code
+        run: mage proto
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          fail_ci_if_error: false
+
+      - name: Generate coverage report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.html
+          retention-days: 14
+
+  validation:
+    name: Generate Validation Report
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Install mage
+        run: go install github.com/magefile/mage@latest
+
+      - name: Generate protobuf code
+        run: mage proto
+
+      - name: Run validation tests
+        run: |
+          go test -v ./executor/local/... -run "Test.*" > validation-test-output.txt 2>&1 || true
+          go test -v ./config/... -run "Test.*" >> validation-test-output.txt 2>&1 || true
+
+      - name: Generate validation summary
+        run: |
+          cat > validation-summary.md <<'EOF'
+          # Validation Test Summary
+
+          **Generated**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Commit**: ${{ github.sha }}
+          **Branch**: ${{ github.ref_name }}
+
+          ## Test Results
+
+          \`\`\`
+          $(cat validation-test-output.txt | grep -E "(PASS|FAIL|RUN|ok|---)" | tail -50)
+          \`\`\`
+
+          ## Requirements Coverage
+
+          See [VALIDATION_STATUS.md](docs/validation/VALIDATION_STATUS.md) for detailed status.
+
+          ## Test Statistics
+
+          - **Total Tests Run**: $(grep -c "=== RUN" validation-test-output.txt || echo "0")
+          - **Passed Tests**: $(grep -c "--- PASS" validation-test-output.txt || echo "0")
+          - **Failed Tests**: $(grep -c "--- FAIL" validation-test-output.txt || echo "0")
+
+          EOF
+
+      - name: Upload validation summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-summary
+          path: |
+            validation-summary.md
+            validation-test-output.txt
+            docs/validation/VALIDATION_STATUS.md
+            docs/validation/REQUIREMENTS.md
+          retention-days: 90
+
+      - name: Comment PR with validation summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('validation-summary.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  build-binaries:
+    name: Build ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    needs: [test, validation]
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - os: linux
+            arch: amd64
+            runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: linux
+            arch: arm64
+            runner: ubuntu-latest
+            goos: linux
+            goarch: arm64
+
+          # macOS builds
+          - os: darwin
+            arch: amd64
+            runner: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: darwin
+            arch: arm64
+            runner: macos-latest
+            goos: darwin
+            goarch: arm64
+
+          # Windows builds
+          - os: windows
+            arch: amd64
+            runner: windows-latest
+            goos: windows
+            goarch: amd64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git describe
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install protoc (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y protobuf-compiler
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install protobuf
+          fi
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Install protoc (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install protoc
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Install mage
+        run: go install github.com/magefile/mage@latest
+
+      - name: Generate protobuf code
+        run: mage proto
+
+      - name: Determine version and build metadata
+        id: metadata
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          fi
+          GIT_COMMIT=$(git rev-parse HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "GIT_COMMIT=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_OUTPUT
+
+          echo "Building version: $VERSION"
+          echo "Git commit: $GIT_COMMIT"
+          echo "Build date: $BUILD_DATE"
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+          VERSION: ${{ steps.metadata.outputs.VERSION }}
+          GIT_COMMIT: ${{ steps.metadata.outputs.GIT_COMMIT }}
+          BUILD_DATE: ${{ steps.metadata.outputs.BUILD_DATE }}
+        run: mage build
+
+      - name: Rename binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd bin
+          if [ -f hermes ]; then
+            mv hermes hermes-${{ matrix.os }}-${{ matrix.arch }}
+          elif [ -f hermes.exe ]; then
+            mv hermes.exe hermes-${{ matrix.os }}-${{ matrix.arch }}.exe
+          fi
+
+      - name: Rename binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd bin
+          if (Test-Path hermes.exe) {
+            Rename-Item hermes.exe hermes-${{ matrix.os }}-${{ matrix.arch }}.exe
+          }
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-${{ matrix.os }}-${{ matrix.arch }}
+          path: bin/hermes-*
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload binary to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: bin/hermes-*
+          draft: false
+          prerelease: false
+
+  build-docker:
+    name: Build and Push Container Image
+    runs-on: ubuntu-latest
+    needs: [test, validation]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git describe
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine version and build args
+        id: meta
+        shell: bash
+        run: |
+          # Determine version
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          fi
+
+          # Get git commit
+          GIT_COMMIT=$(git rev-parse HEAD)
+
+          # Get build date
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "GIT_COMMIT=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_OUTPUT
+
+          echo "Building version: $VERSION"
+          echo "Git commit: $GIT_COMMIT"
+          echo "Build date: $BUILD_DATE"
+
+      - name: Extract Docker metadata
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.VERSION }}
+            GIT_COMMIT=${{ steps.meta.outputs.GIT_COMMIT }}
+            BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image digest
+        run: echo "Image digest:" ${{ steps.build.outputs.digest }}
