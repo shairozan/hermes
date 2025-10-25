@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package hermes;
 
-option go_package = "github.com/hermes/hermes/proto;hermespb";
+option go_package = "github.com/pharmalytica/hermes/proto;hermespb";
 
 service Hermes {
   // Execute a command in a container and stream results
@@ -13,6 +13,9 @@ service Hermes {
 
   // Health check
   rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Get version information
+  rpc GetVersion(VersionRequest) returns (VersionResponse);
 }
 
 message ExecutionRequest {
@@ -155,4 +158,23 @@ message HealthResponse {
 message DockerStatus {
   bool available = 1;
   string version = 2;
+}
+
+message VersionRequest {}
+
+message VersionResponse {
+  // Semantic version (e.g., "1.0.0", "dev")
+  string version = 1;
+
+  // Git commit hash
+  string git_commit = 2;
+
+  // Build date in RFC3339 format
+  string build_date = 3;
+
+  // Go version used to build
+  string go_version = 4;
+
+  // Platform (e.g., "linux/amd64", "windows/amd64")
+  string platform = 5;
 }

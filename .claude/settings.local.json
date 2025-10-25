@@ -15,7 +15,9 @@
       "Bash(protoc:*)",
       "Bash(go test:*)",
       "Bash(go clean:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(mage build:*)",
+      "Bash(mage clean:*)"
     ],
     "deny": [],
     "ask": []

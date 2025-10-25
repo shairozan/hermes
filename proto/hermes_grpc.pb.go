@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Hermes_Execute_FullMethodName = "/hermes.Hermes/Execute"
-	Hermes_Cancel_FullMethodName  = "/hermes.Hermes/Cancel"
-	Hermes_Health_FullMethodName  = "/hermes.Hermes/Health"
+	Hermes_Execute_FullMethodName    = "/hermes.Hermes/Execute"
+	Hermes_Cancel_FullMethodName     = "/hermes.Hermes/Cancel"
+	Hermes_Health_FullMethodName     = "/hermes.Hermes/Health"
+	Hermes_GetVersion_FullMethodName = "/hermes.Hermes/GetVersion"
 )
 
 // HermesClient is the client API for Hermes service.
@@ -34,6 +35,8 @@ type HermesClient interface {
 	Cancel(ctx context.Context, in *CancelRequest, opts ...grpc.CallOption) (*CancelResponse, error)
 	// Health check
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
+	// Get version information
+	GetVersion(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
 }
 
 type hermesClient struct {
@@ -83,6 +86,16 @@ func (c *hermesClient) Health(ctx context.Context, in *HealthRequest, opts ...gr
 	return out, nil
 }
 
+func (c *hermesClient) GetVersion(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VersionResponse)
+	err := c.cc.Invoke(ctx, Hermes_GetVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // HermesServer is the server API for Hermes service.
 // All implementations must embed UnimplementedHermesServer
 // for forward compatibility.
@@ -93,6 +106,8 @@ type HermesServer interface {
 	Cancel(context.Context, *CancelRequest) (*CancelResponse, error)
 	// Health check
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
+	// Get version information
+	GetVersion(context.Context, *VersionRequest) (*VersionResponse, error)
 	mustEmbedUnimplementedHermesServer()
 }
 
@@ -111,6 +126,9 @@ func (UnimplementedHermesServer) Cancel(context.Context, *CancelRequest) (*Cance
 }
 func (UnimplementedHermesServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
+}
+func (UnimplementedHermesServer) GetVersion(context.Context, *VersionRequest) (*VersionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVersion not implemented")
 }
 func (UnimplementedHermesServer) mustEmbedUnimplementedHermesServer() {}
 func (UnimplementedHermesServer) testEmbeddedByValue()                {}
@@ -180,6 +198,24 @@ func _Hermes_Health_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Hermes_GetVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HermesServer).GetVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Hermes_GetVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HermesServer).GetVersion(ctx, req.(*VersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Hermes_ServiceDesc is the grpc.ServiceDesc for Hermes service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -194,6 +230,10 @@ var Hermes_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Health",
 			Handler:    _Hermes_Health_Handler,
+		},
+		{
+			MethodName: "GetVersion",
+			Handler:    _Hermes_GetVersion_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

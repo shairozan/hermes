@@ -920,6 +920,123 @@ func (x *DockerStatus) GetVersion() string {
 	return ""
 }
 
+type VersionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VersionRequest) Reset() {
+	*x = VersionRequest{}
+	mi := &file_proto_hermes_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VersionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VersionRequest) ProtoMessage() {}
+
+func (x *VersionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_hermes_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VersionRequest.ProtoReflect.Descriptor instead.
+func (*VersionRequest) Descriptor() ([]byte, []int) {
+	return file_proto_hermes_proto_rawDescGZIP(), []int{13}
+}
+
+type VersionResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Semantic version (e.g., "1.0.0", "dev")
+	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	// Git commit hash
+	GitCommit string `protobuf:"bytes,2,opt,name=git_commit,json=gitCommit,proto3" json:"git_commit,omitempty"`
+	// Build date in RFC3339 format
+	BuildDate string `protobuf:"bytes,3,opt,name=build_date,json=buildDate,proto3" json:"build_date,omitempty"`
+	// Go version used to build
+	GoVersion string `protobuf:"bytes,4,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
+	// Platform (e.g., "linux/amd64", "windows/amd64")
+	Platform      string `protobuf:"bytes,5,opt,name=platform,proto3" json:"platform,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VersionResponse) Reset() {
+	*x = VersionResponse{}
+	mi := &file_proto_hermes_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VersionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VersionResponse) ProtoMessage() {}
+
+func (x *VersionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_hermes_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VersionResponse.ProtoReflect.Descriptor instead.
+func (*VersionResponse) Descriptor() ([]byte, []int) {
+	return file_proto_hermes_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *VersionResponse) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *VersionResponse) GetGitCommit() string {
+	if x != nil {
+		return x.GitCommit
+	}
+	return ""
+}
+
+func (x *VersionResponse) GetBuildDate() string {
+	if x != nil {
+		return x.BuildDate
+	}
+	return ""
+}
+
+func (x *VersionResponse) GetGoVersion() string {
+	if x != nil {
+		return x.GoVersion
+	}
+	return ""
+}
+
+func (x *VersionResponse) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
 var File_proto_hermes_proto protoreflect.FileDescriptor
 
 const file_proto_hermes_proto_rawDesc = "" +
@@ -992,11 +1109,23 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"\x06docker\x18\x03 \x01(\v2\x14.hermes.DockerStatusR\x06docker\"F\n" +
 	"\fDockerStatus\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion2\xb9\x01\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\"\x10\n" +
+	"\x0eVersionRequest\"\xa4\x01\n" +
+	"\x0fVersionResponse\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\x12\x1d\n" +
+	"\n" +
+	"git_commit\x18\x02 \x01(\tR\tgitCommit\x12\x1d\n" +
+	"\n" +
+	"build_date\x18\x03 \x01(\tR\tbuildDate\x12\x1d\n" +
+	"\n" +
+	"go_version\x18\x04 \x01(\tR\tgoVersion\x12\x1a\n" +
+	"\bplatform\x18\x05 \x01(\tR\bplatform2\xf8\x01\n" +
 	"\x06Hermes\x12=\n" +
 	"\aExecute\x12\x18.hermes.ExecutionRequest\x1a\x16.hermes.ExecutionEvent0\x01\x127\n" +
 	"\x06Cancel\x12\x15.hermes.CancelRequest\x1a\x16.hermes.CancelResponse\x127\n" +
-	"\x06Health\x12\x15.hermes.HealthRequest\x1a\x16.hermes.HealthResponseB)Z'github.com/pharmalytica/hermes/proto;hermespbb\x06proto3"
+	"\x06Health\x12\x15.hermes.HealthRequest\x1a\x16.hermes.HealthResponse\x12=\n" +
+	"\n" +
+	"GetVersion\x12\x16.hermes.VersionRequest\x1a\x17.hermes.VersionResponseB/Z-github.com/pharmalytica/hermes/proto;hermespbb\x06proto3"
 
 var (
 	file_proto_hermes_proto_rawDescOnce sync.Once
@@ -1010,7 +1139,7 @@ func file_proto_hermes_proto_rawDescGZIP() []byte {
 	return file_proto_hermes_proto_rawDescData
 }
 
-var file_proto_hermes_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_proto_hermes_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_proto_hermes_proto_goTypes = []any{
 	(*ExecutionRequest)(nil),  // 0: hermes.ExecutionRequest
 	(*ResourceLimits)(nil),    // 1: hermes.ResourceLimits
@@ -1025,12 +1154,14 @@ var file_proto_hermes_proto_goTypes = []any{
 	(*HealthRequest)(nil),     // 10: hermes.HealthRequest
 	(*HealthResponse)(nil),    // 11: hermes.HealthResponse
 	(*DockerStatus)(nil),      // 12: hermes.DockerStatus
-	nil,                       // 13: hermes.ExecutionRequest.FilesEntry
-	nil,                       // 14: hermes.ExecutionRequest.EnvironmentEntry
+	(*VersionRequest)(nil),    // 13: hermes.VersionRequest
+	(*VersionResponse)(nil),   // 14: hermes.VersionResponse
+	nil,                       // 15: hermes.ExecutionRequest.FilesEntry
+	nil,                       // 16: hermes.ExecutionRequest.EnvironmentEntry
 }
 var file_proto_hermes_proto_depIdxs = []int32{
-	13, // 0: hermes.ExecutionRequest.files:type_name -> hermes.ExecutionRequest.FilesEntry
-	14, // 1: hermes.ExecutionRequest.environment:type_name -> hermes.ExecutionRequest.EnvironmentEntry
+	15, // 0: hermes.ExecutionRequest.files:type_name -> hermes.ExecutionRequest.FilesEntry
+	16, // 1: hermes.ExecutionRequest.environment:type_name -> hermes.ExecutionRequest.EnvironmentEntry
 	1,  // 2: hermes.ExecutionRequest.limits:type_name -> hermes.ResourceLimits
 	3,  // 3: hermes.ExecutionEvent.started:type_name -> hermes.ContainerStarted
 	4,  // 4: hermes.ExecutionEvent.stdout:type_name -> hermes.LogLine
@@ -1042,11 +1173,13 @@ var file_proto_hermes_proto_depIdxs = []int32{
 	0,  // 10: hermes.Hermes.Execute:input_type -> hermes.ExecutionRequest
 	8,  // 11: hermes.Hermes.Cancel:input_type -> hermes.CancelRequest
 	10, // 12: hermes.Hermes.Health:input_type -> hermes.HealthRequest
-	2,  // 13: hermes.Hermes.Execute:output_type -> hermes.ExecutionEvent
-	9,  // 14: hermes.Hermes.Cancel:output_type -> hermes.CancelResponse
-	11, // 15: hermes.Hermes.Health:output_type -> hermes.HealthResponse
-	13, // [13:16] is the sub-list for method output_type
-	10, // [10:13] is the sub-list for method input_type
+	13, // 13: hermes.Hermes.GetVersion:input_type -> hermes.VersionRequest
+	2,  // 14: hermes.Hermes.Execute:output_type -> hermes.ExecutionEvent
+	9,  // 15: hermes.Hermes.Cancel:output_type -> hermes.CancelResponse
+	11, // 16: hermes.Hermes.Health:output_type -> hermes.HealthResponse
+	14, // 17: hermes.Hermes.GetVersion:output_type -> hermes.VersionResponse
+	14, // [14:18] is the sub-list for method output_type
+	10, // [10:14] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name
@@ -1071,7 +1204,7 @@ func file_proto_hermes_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_hermes_proto_rawDesc), len(file_proto_hermes_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

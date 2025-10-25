@@ -6,7 +6,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -22,11 +25,66 @@ func Proto() error {
 	)
 }
 
+// getVersion returns the version to use for the build
+func getVersion() string {
+	// Check if VERSION env var is set
+	if v := os.Getenv("VERSION"); v != "" {
+		return v
+	}
+
+	// Try to get version from git tag
+	cmd := exec.Command("git", "describe", "--tags", "--always", "--dirty")
+	if output, err := cmd.Output(); err == nil {
+		return strings.TrimSpace(string(output))
+	}
+
+	// Default to dev
+	return "dev"
+}
+
+// getGitCommit returns the current git commit hash
+func getGitCommit() string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	if output, err := cmd.Output(); err == nil {
+		return strings.TrimSpace(string(output))
+	}
+	return "unknown"
+}
+
+// getBuildDate returns the current build date in RFC3339 format
+func getBuildDate() string {
+	return time.Now().UTC().Format(time.RFC3339)
+}
+
 // Build builds the hermes binary
 func Build() error {
 	mg.Deps(Proto)
 	fmt.Println("Building hermes...")
-	return sh.RunV("go", "build", "-o", "bin/hermes", "./cmd/hermes")
+
+	// Get version information
+	version := getVersion()
+	gitCommit := getGitCommit()
+	buildDate := getBuildDate()
+
+	// Build ldflags
+	ldflags := fmt.Sprintf(
+		"-X 'github.com/pharmalytica/hermes/version.Version=%s' "+
+			"-X 'github.com/pharmalytica/hermes/version.GitCommit=%s' "+
+			"-X 'github.com/pharmalytica/hermes/version.BuildDate=%s'",
+		version, gitCommit, buildDate,
+	)
+
+	fmt.Printf("Version: %s\n", version)
+	fmt.Printf("Git Commit: %s\n", gitCommit)
+	fmt.Printf("Build Date: %s\n", buildDate)
+
+	// Determine output binary name (add .exe on Windows)
+	outputBinary := "bin/hermes"
+	if os.Getenv("GOOS") == "windows" || (os.Getenv("GOOS") == "" && os.PathSeparator == '\\') {
+		outputBinary = "bin/hermes.exe"
+	}
+
+	return sh.RunV("go", "build", "-ldflags", ldflags, "-o", outputBinary, "./cmd/hermes")
 }
 
 // Test runs all tests

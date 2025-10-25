@@ -7,6 +7,7 @@ import (
 	"github.com/pharmalytica/hermes/config"
 	"github.com/pharmalytica/hermes/executor"
 	pb "github.com/pharmalytica/hermes/proto"
+	"github.com/pharmalytica/hermes/version"
 )
 
 // Server implements the Hermes gRPC service
@@ -99,6 +100,19 @@ func (s *Server) Health(ctx context.Context, req *pb.HealthRequest) (*pb.HealthR
 			Available: health.DockerHealthy,
 			Version:   health.DockerVersion,
 		},
+	}, nil
+}
+
+// GetVersion implements the GetVersion RPC method
+func (s *Server) GetVersion(ctx context.Context, req *pb.VersionRequest) (*pb.VersionResponse, error) {
+	info := version.Get()
+
+	return &pb.VersionResponse{
+		Version:    info.Version,
+		GitCommit:  info.GitCommit,
+		BuildDate:  info.BuildDate,
+		GoVersion:  info.GoVersion,
+		Platform:   info.Platform,
 	}, nil
 }
 
