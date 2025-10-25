@@ -99,7 +99,7 @@ func Build() error {
 		outputBinary = "bin/hermes.exe"
 	}
 
-	return sh.RunV("go", "build", "-ldflags", ldflags, "-o", outputBinary, "./cmd/hermes")
+	return sh.RunV("go", "build", "-ldflags="+ldflags, "-o", outputBinary, "./cmd/hermes")
 }
 
 // Test runs all tests
