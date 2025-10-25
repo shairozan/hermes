@@ -90,47 +90,17 @@ jobs:
       - name: Generate protobuf code
         run: mage proto
 
-      - name: Run validation tests
-        run: |
-          go test -v ./executor/local/... -run "Test.*" > validation-test-output.txt 2>&1 || true
-          go test -v ./config/... -run "Test.*" >> validation-test-output.txt 2>&1 || true
+      - name: Run validation tests and generate report
+        run: mage validate
 
-      - name: Generate validation summary
-        run: |
-          cat > validation-summary.md <<'EOF'
-          # Validation Test Summary
-
-          **Generated**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          **Commit**: ${{ github.sha }}
-          **Branch**: ${{ github.ref_name }}
-
-          ## Test Results
-
-          \`\`\`
-          $(cat validation-test-output.txt | grep -E "(PASS|FAIL|RUN|ok|---)" | tail -50)
-          \`\`\`
-
-          ## Requirements Coverage
-
-          See [VALIDATION_STATUS.md](docs/validation/VALIDATION_STATUS.md) for detailed status.
-
-          ## Test Statistics
-
-          - **Total Tests Run**: $(grep -c "=== RUN" validation-test-output.txt || echo "0")
-          - **Passed Tests**: $(grep -c "--- PASS" validation-test-output.txt || echo "0")
-          - **Failed Tests**: $(grep -c "--- FAIL" validation-test-output.txt || echo "0")
-
-          EOF
-
-      - name: Upload validation summary
+      - name: Upload validation reports
         uses: actions/upload-artifact@v4
         with:
-          name: validation-summary
+          name: validation-reports
           path: |
-            validation-summary.md
-            validation-test-output.txt
-            docs/validation/VALIDATION_STATUS.md
-            docs/validation/REQUIREMENTS.md
+            docs/validation/VALIDATION_REPORT.md
+            docs/validation/validation-report.json
+            docs/validation/requirements.json
           retention-days: 90
 
       - name: Comment PR with validation summary
@@ -139,12 +109,26 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const summary = fs.readFileSync('validation-summary.md', 'utf8');
+            const report = fs.readFileSync('docs/validation/VALIDATION_REPORT.md', 'utf8');
+
+            // Extract just the summary section for the PR comment
+            const summaryMatch = report.match(/## Summary\n\n([\s\S]*?)\n\n## Requirements/);
+            const tableMatch = report.match(/## Requirements Validation Status\n\n([\s\S]*?)\n\n## Requirements Detail/);
+
+            let comment = '# Validation Test Report\n\n';
+            if (summaryMatch) {
+              comment += '## Summary\n\n' + summaryMatch[1] + '\n\n';
+            }
+            if (tableMatch) {
+              comment += '## Requirements Validation Status\n\n' + tableMatch[1] + '\n\n';
+            }
+            comment += '\n📄 Full validation report available in workflow artifacts.';
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: summary
+              body: comment
             });
 
   build-binaries:
