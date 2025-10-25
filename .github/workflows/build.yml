@@ -86,8 +86,8 @@ jobs:
       - name: Generate protobuf code
         run: mage proto
 
-      - name: Determine version
-        id: version
+      - name: Determine version and build metadata
+        id: metadata
         shell: bash
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
@@ -95,15 +95,25 @@ jobs:
           else
             VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
           fi
+          GIT_COMMIT=$(git rev-parse HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "GIT_COMMIT=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_OUTPUT
+
           echo "Building version: $VERSION"
+          echo "Git commit: $GIT_COMMIT"
+          echo "Build date: $BUILD_DATE"
 
       - name: Build binary
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
-          VERSION: ${{ steps.version.outputs.VERSION }}
+          VERSION: ${{ steps.metadata.outputs.VERSION }}
+          GIT_COMMIT: ${{ steps.metadata.outputs.GIT_COMMIT }}
+          BUILD_DATE: ${{ steps.metadata.outputs.BUILD_DATE }}
         run: mage build
 
       - name: Rename binary (Linux/macOS)

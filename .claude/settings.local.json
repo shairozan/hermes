@@ -20,7 +20,8 @@
       "Bash(mage clean:*)",
       "Bash(docker build:*)",
       "Bash(VERSION=test123 GIT_COMMIT=abc456 BUILD_DATE=2025-10-25 mage build:*)",
-      "Bash(docker run:*)"
+      "Bash(docker run:*)",
+      "Bash(VERSION=newtest mage build:*)"
     ],
     "deny": [],
     "ask": []

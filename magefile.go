@@ -88,6 +88,11 @@ func Build() error {
 	fmt.Printf("Git Commit: %s\n", gitCommit)
 	fmt.Printf("Build Date: %s\n", buildDate)
 
+	// Create bin directory if it doesn't exist
+	if err := os.MkdirAll("bin", 0755); err != nil {
+		return fmt.Errorf("failed to create bin directory: %w", err)
+	}
+
 	// Determine output binary name (add .exe on Windows)
 	outputBinary := "bin/hermes"
 	if os.Getenv("GOOS") == "windows" || (os.Getenv("GOOS") == "" && os.PathSeparator == '\\') {
