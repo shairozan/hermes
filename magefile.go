@@ -44,6 +44,11 @@ func getVersion() string {
 
 // getGitCommit returns the current git commit hash
 func getGitCommit() string {
+	// Check if GIT_COMMIT env var is set
+	if c := os.Getenv("GIT_COMMIT"); c != "" {
+		return c
+	}
+
 	cmd := exec.Command("git", "rev-parse", "HEAD")
 	if output, err := cmd.Output(); err == nil {
 		return strings.TrimSpace(string(output))
@@ -53,6 +58,11 @@ func getGitCommit() string {
 
 // getBuildDate returns the current build date in RFC3339 format
 func getBuildDate() string {
+	// Check if BUILD_DATE env var is set
+	if d := os.Getenv("BUILD_DATE"); d != "" {
+		return d
+	}
+
 	return time.Now().UTC().Format(time.RFC3339)
 }
 
