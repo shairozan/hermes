@@ -68,9 +68,9 @@ func Build() error {
 
 	// Build ldflags
 	ldflags := fmt.Sprintf(
-		"-X 'github.com/pharmalytica/hermes/version.Version=%s' "+
-			"-X 'github.com/pharmalytica/hermes/version.GitCommit=%s' "+
-			"-X 'github.com/pharmalytica/hermes/version.BuildDate=%s'",
+		"-X github.com/pharmalytica/hermes/version.Version=%s "+
+			"-X github.com/pharmalytica/hermes/version.GitCommit=%s "+
+			"-X github.com/pharmalytica/hermes/version.BuildDate=%s",
 		version, gitCommit, buildDate,
 	)
 
