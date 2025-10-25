@@ -31,9 +31,12 @@ ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
 
 RUN mage proto && \
+    mkdir -p bin && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    VERSION=${VERSION} GIT_COMMIT=${GIT_COMMIT} BUILD_DATE=${BUILD_DATE} \
-    mage build
+    go build \
+    -ldflags "-X 'github.com/pharmalytica/hermes/version.Version=${VERSION}' -X 'github.com/pharmalytica/hermes/version.GitCommit=${GIT_COMMIT}' -X 'github.com/pharmalytica/hermes/version.BuildDate=${BUILD_DATE}'" \
+    -o bin/hermes \
+    ./cmd/hermes
 
 # Runtime stage
 FROM debian:trixie-slim
