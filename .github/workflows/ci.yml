@@ -93,6 +93,20 @@ jobs:
       - name: Run validation tests and generate report
         run: mage validate
 
+      - name: Verify validation reports were generated
+        run: |
+          echo "Checking for validation reports..."
+          ls -lah docs/validation/
+          if [ ! -f docs/validation/VALIDATION_REPORT.md ]; then
+            echo "ERROR: VALIDATION_REPORT.md was not generated!"
+            exit 1
+          fi
+          if [ ! -f docs/validation/validation-report.json ]; then
+            echo "ERROR: validation-report.json was not generated!"
+            exit 1
+          fi
+          echo "✅ All validation reports found"
+
       - name: Upload validation reports
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +116,7 @@ jobs:
             docs/validation/validation-report.json
             docs/validation/requirements.json
           retention-days: 90
+          if-no-files-found: error
 
       - name: Comment PR with validation summary
         if: github.event_name == 'pull_request'
