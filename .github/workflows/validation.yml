@@ -1,0 +1,100 @@
+name: Validation Document
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'docs/validation/**'
+      - 'executor/**/*_test.go'
+      - 'config/**/*_test.go'
+      - '.github/workflows/validation.yml'
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  render-validation:
+    name: Render Validation Documents
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Install mage
+        run: go install github.com/magefile/mage@latest
+
+      - name: Generate protobuf code
+        run: mage proto
+
+      - name: Run validation tests
+        run: |
+          go test -v ./executor/local/... -run "Test.*" > validation-test-output.txt 2>&1 || true
+          go test -v ./config/... -run "Test.*" >> validation-test-output.txt 2>&1 || true
+
+      - name: Generate validation summary
+        run: |
+          cat > validation-summary.md <<'EOF'
+          # Validation Test Summary
+
+          **Generated**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Commit**: ${{ github.sha }}
+          **Branch**: ${{ github.ref_name }}
+
+          ## Test Results
+
+          \`\`\`
+          $(cat validation-test-output.txt | grep -E "(PASS|FAIL|RUN|ok|---)" | tail -50)
+          \`\`\`
+
+          ## Requirements Coverage
+
+          See [VALIDATION_STATUS.md](docs/validation/VALIDATION_STATUS.md) for detailed status.
+
+          ## Test Statistics
+
+          - **Total Tests Run**: $(grep -c "=== RUN" validation-test-output.txt || echo "0")
+          - **Passed Tests**: $(grep -c "--- PASS" validation-test-output.txt || echo "0")
+          - **Failed Tests**: $(grep -c "--- FAIL" validation-test-output.txt || echo "0")
+
+          EOF
+
+      - name: Upload validation summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-summary
+          path: |
+            validation-summary.md
+            validation-test-output.txt
+            docs/validation/VALIDATION_STATUS.md
+            docs/validation/REQUIREMENTS.md
+          retention-days: 90
+
+      - name: Comment PR with validation summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('validation-summary.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
