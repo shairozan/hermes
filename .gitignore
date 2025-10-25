@@ -1,0 +1,172 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Go workspace file
+go.work
+
+# Build output
+/bin/
+/dist/
+/build/
+/out/
+
+# Hermes specific binaries
+hermes
+hermes.exe
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test artifacts
+coverage.txt
+coverage.html
+*.cover
+*.coverprofile
+
+# Workspace directories created during tests
+/hermes-workspaces/
+**/test-workspace-*/
+**/workspace-*/
+
+# mage build artifacts
+.mage/
+
+# Protocol buffer generated files (if you want to regenerate them)
+# Uncomment if proto files should be regenerated in CI/CD
+# *.pb.go
+# *_grpc.pb.go
+
+# Sensitive files (should never be committed)
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+credentials.json
+secrets.yaml
+config.local.yaml
+
+# GxP validation artifacts (might be generated)
+validation-report.pdf
+validation-logs/
+
+# OS specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Windows specific
+*.lnk
+
+# Mac specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux specific
+.directory
+.Trash-*
+
+# JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VSCode
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/extensions.json
+.history/
+
+# Documentation build artifacts
+docs/_build/
+docs/.doctrees/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Database files (if any local DBs are used)
+*.db
+*.sqlite
+*.sqlite3
+
+# Configuration overrides
+config.override.yaml
+local.yaml
+
+# Docker volumes and data
+docker-volumes/
+.dockerignore.local
+
+# CI/CD artifacts
+.gitlab-ci-local/
+.github/workflows/local/
+
+# Audit logs (if stored locally during development)
+audit-*.log
+audit-*.json
+
+# Performance test results
+benchmarks/
+*.bench
+
+# Generated documentation
+*.html
+!docs/**/*.html
+
+# Node modules (if any web UI is added later)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python virtual environments (if any Python tooling is added)
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Miscellaneous
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

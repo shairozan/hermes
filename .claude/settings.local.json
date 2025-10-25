@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod init:*)",
+      "Bash(mkdir:*)",
+      "Bash(go get:*)",
+      "Bash(go run:*)",
+      "Bash(mage install:*)",
+      "Bash(mage proto:*)",
+      "Bash(go build:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go list:*)",
+      "Bash(go doc:*)",
+      "Bash(./bin/hermes.exe:*)",
+      "Bash(protoc:*)",
+      "Bash(go test:*)",
+      "Bash(go clean:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package hermes;
+
+option go_package = "github.com/hermes/hermes/proto;hermespb";
+
+service Hermes {
+  // Execute a command in a container and stream results
+  rpc Execute(ExecutionRequest) returns (stream ExecutionEvent);
+
+  // Cancel a running execution
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+
+  // Health check
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message ExecutionRequest {
+  // Full path to the command to execute inside the container
+  // Example: "/opt/NONMEM/nm76/run/nmfe76"
+  string command = 1;
+
+  // Arguments to pass to the command
+  // Example: ["model.mod", "model.lst"]
+  repeated string args = 2;
+
+  // Working directory inside the container (where files are written)
+  // Example: "/workspace"
+  string working_dir = 3;
+
+  // Files to inject into the container
+  // Key: relative path from working_dir
+  // Value: file content as bytes
+  // Example: {"model.mod": <bytes>, "data.csv": <bytes>, "license.lic": <bytes>}
+  map<string, bytes> files = 4;
+
+  // File patterns to retain after execution (glob patterns)
+  // These files are collected and returned in the response stream
+  // Example: ["*.lst", "*.ext", "*.cov", "FDATA", "output/*.xml"]
+  repeated string retain = 5;
+
+  // Docker image to use for execution
+  // Example: "pharmalytica/nonmem:nm76"
+  string container_image = 6;
+
+  // Environment variables to set in the container
+  // Example: {"OMP_NUM_THREADS": "4", "NONMEM_LICENSE_FILE": "/workspace/license.lic"}
+  map<string, string> environment = 7;
+
+  // Resource limits (optional)
+  ResourceLimits limits = 8;
+
+  // Execution ID for tracking and cancellation (optional)
+  // If provided, used for audit trail correlation and workspace isolation
+  // If empty, server generates a UUID
+  // Client should provide this to align with audit log entries
+  // Example: "audit-entry-12345" or "janus-job-abc-def"
+  string execution_id = 9;
+}
+
+message ResourceLimits {
+  // CPU limit (e.g., "4" for 4 cores, "2.5" for 2.5 cores)
+  // Used for request validation and per-execution CPU shares
+  string cpu_limit = 1;
+
+  // Memory limit (e.g., "8G" for 8 gigabytes, "512M" for 512 megabytes)
+  // Used for request validation and per-execution memory limits
+  string memory_limit = 2;
+
+  // Execution timeout (seconds)
+  // Per-execution timeout (not container-level)
+  int64 timeout_seconds = 3;
+}
+
+message ExecutionEvent {
+  // Execution ID for tracking
+  string execution_id = 1;
+
+  // Event timestamp (Unix epoch)
+  int64 timestamp = 2;
+
+  oneof event {
+    // Container started
+    ContainerStarted started = 10;
+
+    // Standard output line
+    LogLine stdout = 11;
+
+    // Standard error line
+    LogLine stderr = 12;
+
+    // Result file being streamed
+    FileChunk file_chunk = 13;
+
+    // Execution completed
+    ExecutionComplete complete = 14;
+
+    // Execution failed
+    ExecutionError error = 15;
+  }
+}
+
+message ContainerStarted {
+  string container_id = 1;
+  string image = 2;
+}
+
+message LogLine {
+  string line = 1;
+  int32 line_number = 2;  // Sequential line number
+}
+
+message FileChunk {
+  // Relative path from working_dir
+  string path = 1;
+
+  // Chunk of file content
+  bytes chunk = 2;
+
+  // Is this the final chunk for this file?
+  bool is_final = 3;
+
+  // Total file size (if known)
+  int64 total_size = 4;
+}
+
+message ExecutionComplete {
+  int32 exit_code = 1;
+  int64 runtime_seconds = 2;
+  int32 files_collected = 3;
+}
+
+message ExecutionError {
+  string message = 1;
+  string error_code = 2;
+}
+
+message CancelRequest {
+  string execution_id = 1;
+}
+
+message CancelResponse {
+  bool cancelled = 1;
+  string message = 2;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  DockerStatus docker = 3;
+}
+
+message DockerStatus {
+  bool available = 1;
+  string version = 2;
+}

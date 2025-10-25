@@ -1,0 +1,49 @@
+# Hermes Configuration Example
+
+server:
+  address: "0.0.0.0"
+  port: 50051
+
+# Executor configuration
+executor:
+  # Execution mode: local, docker, file-server, scheduler
+  mode: "local"
+
+  # Local executor configuration
+  local:
+    workspace_base: ""  # Empty = use system temp directory
+
+  # Docker executor configuration (used when mode: docker)
+  docker:
+    socket: "unix:///var/run/docker.sock"
+
+overrides:
+  # Command path overrides
+  # Pattern: glob pattern matching the client-provided command path
+  # Target: actual path to use inside the container
+  commands:
+    - pattern: "*/nmfe76"
+      target: "/opt/NONMEM/nm76/run/nmfe76"
+      description: "Redirect any nmfe76 to installed NONMEM 7.6"
+
+    - pattern: "*/nmfe75"
+      target: "/opt/NONMEM/nm75/run/nmfe75"
+      description: "Redirect any nmfe75 to installed NONMEM 7.5"
+
+    - pattern: "nmfe*"
+      target: "/opt/NONMEM/nm76/run/nmfe76"
+      description: "Default NONMEM executable"
+
+  # File path overrides for retained files
+  # Allows clients to request files using generic paths
+  # that map to container-specific locations
+  retain_paths:
+    - pattern: "output/*"
+      target: "/var/results/*"
+      description: "Map output directory to /var/results"
+
+  # Environment variable injections
+  # Always add these to every execution
+  environment:
+    NONMEM_LICENSE_FILE: "/workspace/nonmem.lic"
+    PATH: "/opt/NONMEM/nm76/run:/usr/local/bin:/usr/bin:/bin"
