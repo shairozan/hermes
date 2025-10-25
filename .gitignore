@@ -23,9 +23,11 @@ go.work
 /build/
 /out/
 
-# Hermes specific binaries
-hermes
-hermes.exe
+# Hermes specific binaries (in bin directory only)
+/bin/hermes
+/bin/hermes.exe
+/hermes
+/hermes.exe
 
 # IDE specific files
 .vscode/
