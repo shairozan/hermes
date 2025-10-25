@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build stage
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.25.3-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -32,11 +32,8 @@ ARG BUILD_DATE=unknown
 
 RUN mage proto && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags "\
-    -X 'github.com/pharmalytica/hermes/version.Version=${VERSION}' \
-    -X 'github.com/pharmalytica/hermes/version.GitCommit=${GIT_COMMIT}' \
-    -X 'github.com/pharmalytica/hermes/version.BuildDate=${BUILD_DATE}'" \
-    -o /build/bin/hermes ./cmd/hermes
+    VERSION=${VERSION} GIT_COMMIT=${GIT_COMMIT} BUILD_DATE=${BUILD_DATE} \
+    mage build
 
 # Runtime stage
 FROM debian:trixie-slim
