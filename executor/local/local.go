@@ -13,9 +13,9 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/google/uuid"
-	"github.com/hermes/hermes/audit"
-	"github.com/hermes/hermes/config"
-	"github.com/hermes/hermes/executor"
+	"github.com/pharmalytica/hermes/audit"
+	"github.com/pharmalytica/hermes/config"
+	"github.com/pharmalytica/hermes/executor"
 )
 
 // LocalExecutor executes commands directly on the host filesystem

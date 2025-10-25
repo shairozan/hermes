@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hermes/hermes/config"
-	"github.com/hermes/hermes/executor"
-	pb "github.com/hermes/hermes/proto"
+	"github.com/pharmalytica/hermes/config"
+	"github.com/pharmalytica/hermes/executor"
+	pb "github.com/pharmalytica/hermes/proto"
 )
 
 // Server implements the Hermes gRPC service

@@ -14,7 +14,8 @@
       "Bash(./bin/hermes.exe:*)",
       "Bash(protoc:*)",
       "Bash(go test:*)",
-      "Bash(go clean:*)"
+      "Bash(go clean:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/hermes/hermes/config"
-	pb "github.com/hermes/hermes/proto"
-	"github.com/hermes/hermes/server"
+	"github.com/pharmalytica/hermes/config"
+	pb "github.com/pharmalytica/hermes/proto"
+	"github.com/pharmalytica/hermes/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
