@@ -13,9 +13,13 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   build:
     name: Build and Push Container Image
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
       packages: write

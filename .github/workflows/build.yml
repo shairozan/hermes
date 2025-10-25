@@ -9,9 +9,13 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   build:
     name: Build ${{ matrix.os }}-${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
+    needs: test
     strategy:
       matrix:
         include:
