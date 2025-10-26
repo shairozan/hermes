@@ -55,6 +55,7 @@ const (
 	EventFileChunk
 	EventComplete
 	EventError
+	EventAuditLog
 )
 
 // ContainerStartedData contains container start information
@@ -88,6 +89,15 @@ type ExecutionCompleteData struct {
 type ExecutionErrorData struct {
 	Message   string
 	ErrorCode string
+}
+
+// AuditLogData contains a single audit log entry
+type AuditLogData struct {
+	Timestamp   string
+	Level       string
+	ExecutionID string
+	Message     string
+	DataJSON    string // Structured data as JSON
 }
 
 // HealthStatus contains health check information

@@ -13,6 +13,10 @@ import (
 type Logger struct {
 	writer io.Writer
 	mu     sync.Mutex
+
+	// Per-execution log buffers for streaming back to client
+	buffers   map[string][]LogEntry
+	buffersMu sync.RWMutex
 }
 
 // LogLevel represents the severity of a log entry
@@ -51,11 +55,13 @@ func NewLogger(writer io.Writer) *Logger {
 	}
 
 	return &Logger{
-		writer: writer,
+		writer:  writer,
+		buffers: make(map[string][]LogEntry),
 	}
 }
 
 // Log writes a structured log entry
+// Logs are written to stdout AND buffered per execution for client streaming
 func (l *Logger) Log(level LogLevel, executionID, message string, data map[string]interface{}) {
 	entry := LogEntry{
 		Timestamp:   time.Now().UTC().Format(time.RFC3339Nano),
@@ -65,13 +71,20 @@ func (l *Logger) Log(level LogLevel, executionID, message string, data map[strin
 		Data:        data,
 	}
 
+	// Write to stdout/configured writer
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	encoder := json.NewEncoder(l.writer)
 	if err := encoder.Encode(entry); err != nil {
 		// Fallback to stderr if logging fails
 		fmt.Fprintf(os.Stderr, "AUDIT LOG FAILURE: %v\n", err)
+	}
+	l.mu.Unlock()
+
+	// Buffer for client streaming (if execution ID provided)
+	if executionID != "" {
+		l.buffersMu.Lock()
+		l.buffers[executionID] = append(l.buffers[executionID], entry)
+		l.buffersMu.Unlock()
 	}
 }
 
@@ -137,6 +150,27 @@ func (l *Logger) AuditExecutionComplete(executionID string, exitCode int32, runt
 		"files_collected": filesCollected,
 	}
 	l.Audit(executionID, "Execution completed", data)
+}
+
+// GetBufferedLogs returns all buffered log entries for an execution
+// This is used to stream audit logs back to the client
+func (l *Logger) GetBufferedLogs(executionID string) []LogEntry {
+	l.buffersMu.RLock()
+	defer l.buffersMu.RUnlock()
+
+	// Return a copy to prevent concurrent modification
+	logs := l.buffers[executionID]
+	result := make([]LogEntry, len(logs))
+	copy(result, logs)
+	return result
+}
+
+// ClearBufferedLogs removes buffered logs for an execution
+// Should be called after streaming logs to client to free memory
+func (l *Logger) ClearBufferedLogs(executionID string) {
+	l.buffersMu.Lock()
+	defer l.buffersMu.Unlock()
+	delete(l.buffers, executionID)
 }
 
 // GetDefaultLogger returns a singleton default logger

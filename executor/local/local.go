@@ -3,6 +3,7 @@ package local
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -235,6 +236,9 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	// Audit execution completion (REQ-AUD-LOC-004)
 	l.logger.AuditExecutionComplete(req.ExecutionID, int32(exitCode), runtimeSeconds, filesCollected)
 
+	// Stream buffered audit logs to client
+	l.streamAuditLogs(events, req.ExecutionID)
+
 	// Send completion event
 	l.sendEvent(events, req.ExecutionID, executor.ExecutionEvent{
 		ExecutionID: req.ExecutionID,
@@ -373,6 +377,38 @@ func (l *LocalExecutor) sendEvent(events chan<- executor.ExecutionEvent, _ strin
 	default:
 		// Event channel full, log warning (would need logger injected)
 	}
+}
+
+// streamAuditLogs streams buffered audit logs to the client
+// This provides the full audit trail for GxP compliance
+func (l *LocalExecutor) streamAuditLogs(events chan<- executor.ExecutionEvent, executionID string) {
+	logs := l.logger.GetBufferedLogs(executionID)
+
+	for _, logEntry := range logs {
+		// Marshal data to JSON string
+		var dataJSON string
+		if logEntry.Data != nil {
+			if jsonBytes, err := json.Marshal(logEntry.Data); err == nil {
+				dataJSON = string(jsonBytes)
+			}
+		}
+
+		l.sendEvent(events, executionID, executor.ExecutionEvent{
+			ExecutionID: executionID,
+			Timestamp:   time.Now().Unix(),
+			Type:        executor.EventAuditLog,
+			Data: &executor.AuditLogData{
+				Timestamp:   logEntry.Timestamp,
+				Level:       string(logEntry.Level),
+				ExecutionID: logEntry.ExecutionID,
+				Message:     logEntry.Message,
+				DataJSON:    dataJSON,
+			},
+		})
+	}
+
+	// Clear buffered logs to free memory
+	l.logger.ClearBufferedLogs(executionID)
 }
 
 // Cancel implements the Executor interface

@@ -232,6 +232,7 @@ type ExecutionEvent struct {
 	//	*ExecutionEvent_FileChunk
 	//	*ExecutionEvent_Complete
 	//	*ExecutionEvent_Error
+	//	*ExecutionEvent_AuditLog
 	Event         isExecutionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -342,6 +343,15 @@ func (x *ExecutionEvent) GetError() *ExecutionError {
 	return nil
 }
 
+func (x *ExecutionEvent) GetAuditLog() *AuditLogEntry {
+	if x != nil {
+		if x, ok := x.Event.(*ExecutionEvent_AuditLog); ok {
+			return x.AuditLog
+		}
+	}
+	return nil
+}
+
 type isExecutionEvent_Event interface {
 	isExecutionEvent_Event()
 }
@@ -376,6 +386,11 @@ type ExecutionEvent_Error struct {
 	Error *ExecutionError `protobuf:"bytes,15,opt,name=error,proto3,oneof"`
 }
 
+type ExecutionEvent_AuditLog struct {
+	// Audit log entry (GxP compliance)
+	AuditLog *AuditLogEntry `protobuf:"bytes,16,opt,name=audit_log,json=auditLog,proto3,oneof"`
+}
+
 func (*ExecutionEvent_Started) isExecutionEvent_Event() {}
 
 func (*ExecutionEvent_Stdout) isExecutionEvent_Event() {}
@@ -387,6 +402,8 @@ func (*ExecutionEvent_FileChunk) isExecutionEvent_Event() {}
 func (*ExecutionEvent_Complete) isExecutionEvent_Event() {}
 
 func (*ExecutionEvent_Error) isExecutionEvent_Event() {}
+
+func (*ExecutionEvent_AuditLog) isExecutionEvent_Event() {}
 
 type ContainerStarted struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -676,6 +693,88 @@ func (x *ExecutionError) GetErrorCode() string {
 	return ""
 }
 
+type AuditLogEntry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Timestamp in RFC3339Nano format
+	Timestamp string `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	// Log level (INFO, WARNING, ERROR, AUDIT)
+	Level string `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
+	// Execution ID (correlation)
+	ExecutionId string `protobuf:"bytes,3,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	// Log message
+	Message string `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	// Structured data as JSON string
+	// Contains additional context like command, args, exit_code, etc.
+	DataJson      string `protobuf:"bytes,5,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuditLogEntry) Reset() {
+	*x = AuditLogEntry{}
+	mi := &file_proto_hermes_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditLogEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditLogEntry) ProtoMessage() {}
+
+func (x *AuditLogEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_hermes_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuditLogEntry.ProtoReflect.Descriptor instead.
+func (*AuditLogEntry) Descriptor() ([]byte, []int) {
+	return file_proto_hermes_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AuditLogEntry) GetTimestamp() string {
+	if x != nil {
+		return x.Timestamp
+	}
+	return ""
+}
+
+func (x *AuditLogEntry) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *AuditLogEntry) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *AuditLogEntry) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AuditLogEntry) GetDataJson() string {
+	if x != nil {
+		return x.DataJson
+	}
+	return ""
+}
+
 type CancelRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ExecutionId   string                 `protobuf:"bytes,1,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
@@ -685,7 +784,7 @@ type CancelRequest struct {
 
 func (x *CancelRequest) Reset() {
 	*x = CancelRequest{}
-	mi := &file_proto_hermes_proto_msgTypes[8]
+	mi := &file_proto_hermes_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +796,7 @@ func (x *CancelRequest) String() string {
 func (*CancelRequest) ProtoMessage() {}
 
 func (x *CancelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_hermes_proto_msgTypes[8]
+	mi := &file_proto_hermes_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -710,7 +809,7 @@ func (x *CancelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRequest.ProtoReflect.Descriptor instead.
 func (*CancelRequest) Descriptor() ([]byte, []int) {
-	return file_proto_hermes_proto_rawDescGZIP(), []int{8}
+	return file_proto_hermes_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CancelRequest) GetExecutionId() string {
@@ -730,7 +829,7 @@ type CancelResponse struct {
 
 func (x *CancelResponse) Reset() {
 	*x = CancelResponse{}
-	mi := &file_proto_hermes_proto_msgTypes[9]
+	mi := &file_proto_hermes_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +841,7 @@ func (x *CancelResponse) String() string {
 func (*CancelResponse) ProtoMessage() {}
 
 func (x *CancelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_hermes_proto_msgTypes[9]
+	mi := &file_proto_hermes_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -755,7 +854,7 @@ func (x *CancelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelResponse.ProtoReflect.Descriptor instead.
 func (*CancelResponse) Descriptor() ([]byte, []int) {
-	return file_proto_hermes_proto_rawDescGZIP(), []int{9}
+	return file_proto_hermes_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CancelResponse) GetCancelled() bool {
@@ -780,7 +879,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_proto_hermes_proto_msgTypes[10]
+	mi := &file_proto_hermes_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -792,7 +891,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_hermes_proto_msgTypes[10]
+	mi := &file_proto_hermes_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -805,7 +904,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_proto_hermes_proto_rawDescGZIP(), []int{10}
+	return file_proto_hermes_proto_rawDescGZIP(), []int{11}
 }
 
 type HealthResponse struct {
@@ -819,7 +918,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_proto_hermes_proto_msgTypes[11]
+	mi := &file_proto_hermes_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -831,7 +930,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_hermes_proto_msgTypes[11]
+	mi := &file_proto_hermes_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -844,7 +943,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_proto_hermes_proto_rawDescGZIP(), []int{11}
+	return file_proto_hermes_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HealthResponse) GetHealthy() bool {
@@ -878,7 +977,7 @@ type DockerStatus struct {
 
 func (x *DockerStatus) Reset() {
 	*x = DockerStatus{}
-	mi := &file_proto_hermes_proto_msgTypes[12]
+	mi := &file_proto_hermes_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -890,7 +989,7 @@ func (x *DockerStatus) String() string {
 func (*DockerStatus) ProtoMessage() {}
 
 func (x *DockerStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_hermes_proto_msgTypes[12]
+	mi := &file_proto_hermes_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -903,7 +1002,7 @@ func (x *DockerStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DockerStatus.ProtoReflect.Descriptor instead.
 func (*DockerStatus) Descriptor() ([]byte, []int) {
-	return file_proto_hermes_proto_rawDescGZIP(), []int{12}
+	return file_proto_hermes_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DockerStatus) GetAvailable() bool {
@@ -928,7 +1027,7 @@ type VersionRequest struct {
 
 func (x *VersionRequest) Reset() {
 	*x = VersionRequest{}
-	mi := &file_proto_hermes_proto_msgTypes[13]
+	mi := &file_proto_hermes_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -940,7 +1039,7 @@ func (x *VersionRequest) String() string {
 func (*VersionRequest) ProtoMessage() {}
 
 func (x *VersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_hermes_proto_msgTypes[13]
+	mi := &file_proto_hermes_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -953,7 +1052,7 @@ func (x *VersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VersionRequest.ProtoReflect.Descriptor instead.
 func (*VersionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_hermes_proto_rawDescGZIP(), []int{13}
+	return file_proto_hermes_proto_rawDescGZIP(), []int{14}
 }
 
 type VersionResponse struct {
@@ -974,7 +1073,7 @@ type VersionResponse struct {
 
 func (x *VersionResponse) Reset() {
 	*x = VersionResponse{}
-	mi := &file_proto_hermes_proto_msgTypes[14]
+	mi := &file_proto_hermes_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -986,7 +1085,7 @@ func (x *VersionResponse) String() string {
 func (*VersionResponse) ProtoMessage() {}
 
 func (x *VersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_hermes_proto_msgTypes[14]
+	mi := &file_proto_hermes_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -999,7 +1098,7 @@ func (x *VersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VersionResponse.ProtoReflect.Descriptor instead.
 func (*VersionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_hermes_proto_rawDescGZIP(), []int{14}
+	return file_proto_hermes_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *VersionResponse) GetVersion() string {
@@ -1063,7 +1162,7 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"\x0eResourceLimits\x12\x1b\n" +
 	"\tcpu_limit\x18\x01 \x01(\tR\bcpuLimit\x12!\n" +
 	"\fmemory_limit\x18\x02 \x01(\tR\vmemoryLimit\x12'\n" +
-	"\x0ftimeout_seconds\x18\x03 \x01(\x03R\x0etimeoutSeconds\"\x83\x03\n" +
+	"\x0ftimeout_seconds\x18\x03 \x01(\x03R\x0etimeoutSeconds\"\xb9\x03\n" +
 	"\x0eExecutionEvent\x12!\n" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\x124\n" +
@@ -1074,7 +1173,8 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"\n" +
 	"file_chunk\x18\r \x01(\v2\x11.hermes.FileChunkH\x00R\tfileChunk\x127\n" +
 	"\bcomplete\x18\x0e \x01(\v2\x19.hermes.ExecutionCompleteH\x00R\bcomplete\x12.\n" +
-	"\x05error\x18\x0f \x01(\v2\x16.hermes.ExecutionErrorH\x00R\x05errorB\a\n" +
+	"\x05error\x18\x0f \x01(\v2\x16.hermes.ExecutionErrorH\x00R\x05error\x124\n" +
+	"\taudit_log\x18\x10 \x01(\v2\x15.hermes.AuditLogEntryH\x00R\bauditLogB\a\n" +
 	"\x05event\"K\n" +
 	"\x10ContainerStarted\x12!\n" +
 	"\fcontainer_id\x18\x01 \x01(\tR\vcontainerId\x12\x14\n" +
@@ -1096,7 +1196,13 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"\x0eExecutionError\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1d\n" +
 	"\n" +
-	"error_code\x18\x02 \x01(\tR\terrorCode\"2\n" +
+	"error_code\x18\x02 \x01(\tR\terrorCode\"\x9d\x01\n" +
+	"\rAuditLogEntry\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x01(\tR\ttimestamp\x12\x14\n" +
+	"\x05level\x18\x02 \x01(\tR\x05level\x12!\n" +
+	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x1b\n" +
+	"\tdata_json\x18\x05 \x01(\tR\bdataJson\"2\n" +
 	"\rCancelRequest\x12!\n" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\"H\n" +
 	"\x0eCancelResponse\x12\x1c\n" +
@@ -1139,7 +1245,7 @@ func file_proto_hermes_proto_rawDescGZIP() []byte {
 	return file_proto_hermes_proto_rawDescData
 }
 
-var file_proto_hermes_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_proto_hermes_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_proto_hermes_proto_goTypes = []any{
 	(*ExecutionRequest)(nil),  // 0: hermes.ExecutionRequest
 	(*ResourceLimits)(nil),    // 1: hermes.ResourceLimits
@@ -1149,19 +1255,20 @@ var file_proto_hermes_proto_goTypes = []any{
 	(*FileChunk)(nil),         // 5: hermes.FileChunk
 	(*ExecutionComplete)(nil), // 6: hermes.ExecutionComplete
 	(*ExecutionError)(nil),    // 7: hermes.ExecutionError
-	(*CancelRequest)(nil),     // 8: hermes.CancelRequest
-	(*CancelResponse)(nil),    // 9: hermes.CancelResponse
-	(*HealthRequest)(nil),     // 10: hermes.HealthRequest
-	(*HealthResponse)(nil),    // 11: hermes.HealthResponse
-	(*DockerStatus)(nil),      // 12: hermes.DockerStatus
-	(*VersionRequest)(nil),    // 13: hermes.VersionRequest
-	(*VersionResponse)(nil),   // 14: hermes.VersionResponse
-	nil,                       // 15: hermes.ExecutionRequest.FilesEntry
-	nil,                       // 16: hermes.ExecutionRequest.EnvironmentEntry
+	(*AuditLogEntry)(nil),     // 8: hermes.AuditLogEntry
+	(*CancelRequest)(nil),     // 9: hermes.CancelRequest
+	(*CancelResponse)(nil),    // 10: hermes.CancelResponse
+	(*HealthRequest)(nil),     // 11: hermes.HealthRequest
+	(*HealthResponse)(nil),    // 12: hermes.HealthResponse
+	(*DockerStatus)(nil),      // 13: hermes.DockerStatus
+	(*VersionRequest)(nil),    // 14: hermes.VersionRequest
+	(*VersionResponse)(nil),   // 15: hermes.VersionResponse
+	nil,                       // 16: hermes.ExecutionRequest.FilesEntry
+	nil,                       // 17: hermes.ExecutionRequest.EnvironmentEntry
 }
 var file_proto_hermes_proto_depIdxs = []int32{
-	15, // 0: hermes.ExecutionRequest.files:type_name -> hermes.ExecutionRequest.FilesEntry
-	16, // 1: hermes.ExecutionRequest.environment:type_name -> hermes.ExecutionRequest.EnvironmentEntry
+	16, // 0: hermes.ExecutionRequest.files:type_name -> hermes.ExecutionRequest.FilesEntry
+	17, // 1: hermes.ExecutionRequest.environment:type_name -> hermes.ExecutionRequest.EnvironmentEntry
 	1,  // 2: hermes.ExecutionRequest.limits:type_name -> hermes.ResourceLimits
 	3,  // 3: hermes.ExecutionEvent.started:type_name -> hermes.ContainerStarted
 	4,  // 4: hermes.ExecutionEvent.stdout:type_name -> hermes.LogLine
@@ -1169,20 +1276,21 @@ var file_proto_hermes_proto_depIdxs = []int32{
 	5,  // 6: hermes.ExecutionEvent.file_chunk:type_name -> hermes.FileChunk
 	6,  // 7: hermes.ExecutionEvent.complete:type_name -> hermes.ExecutionComplete
 	7,  // 8: hermes.ExecutionEvent.error:type_name -> hermes.ExecutionError
-	12, // 9: hermes.HealthResponse.docker:type_name -> hermes.DockerStatus
-	0,  // 10: hermes.Hermes.Execute:input_type -> hermes.ExecutionRequest
-	8,  // 11: hermes.Hermes.Cancel:input_type -> hermes.CancelRequest
-	10, // 12: hermes.Hermes.Health:input_type -> hermes.HealthRequest
-	13, // 13: hermes.Hermes.GetVersion:input_type -> hermes.VersionRequest
-	2,  // 14: hermes.Hermes.Execute:output_type -> hermes.ExecutionEvent
-	9,  // 15: hermes.Hermes.Cancel:output_type -> hermes.CancelResponse
-	11, // 16: hermes.Hermes.Health:output_type -> hermes.HealthResponse
-	14, // 17: hermes.Hermes.GetVersion:output_type -> hermes.VersionResponse
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	8,  // 9: hermes.ExecutionEvent.audit_log:type_name -> hermes.AuditLogEntry
+	13, // 10: hermes.HealthResponse.docker:type_name -> hermes.DockerStatus
+	0,  // 11: hermes.Hermes.Execute:input_type -> hermes.ExecutionRequest
+	9,  // 12: hermes.Hermes.Cancel:input_type -> hermes.CancelRequest
+	11, // 13: hermes.Hermes.Health:input_type -> hermes.HealthRequest
+	14, // 14: hermes.Hermes.GetVersion:input_type -> hermes.VersionRequest
+	2,  // 15: hermes.Hermes.Execute:output_type -> hermes.ExecutionEvent
+	10, // 16: hermes.Hermes.Cancel:output_type -> hermes.CancelResponse
+	12, // 17: hermes.Hermes.Health:output_type -> hermes.HealthResponse
+	15, // 18: hermes.Hermes.GetVersion:output_type -> hermes.VersionResponse
+	15, // [15:19] is the sub-list for method output_type
+	11, // [11:15] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_proto_hermes_proto_init() }
@@ -1197,6 +1305,7 @@ func file_proto_hermes_proto_init() {
 		(*ExecutionEvent_FileChunk)(nil),
 		(*ExecutionEvent_Complete)(nil),
 		(*ExecutionEvent_Error)(nil),
+		(*ExecutionEvent_AuditLog)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1204,7 +1313,7 @@ func file_proto_hermes_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_hermes_proto_rawDesc), len(file_proto_hermes_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

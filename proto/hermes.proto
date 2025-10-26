@@ -100,6 +100,9 @@ message ExecutionEvent {
 
     // Execution failed
     ExecutionError error = 15;
+
+    // Audit log entry (GxP compliance)
+    AuditLogEntry audit_log = 16;
   }
 }
 
@@ -136,6 +139,24 @@ message ExecutionComplete {
 message ExecutionError {
   string message = 1;
   string error_code = 2;
+}
+
+message AuditLogEntry {
+  // Timestamp in RFC3339Nano format
+  string timestamp = 1;
+
+  // Log level (INFO, WARNING, ERROR, AUDIT)
+  string level = 2;
+
+  // Execution ID (correlation)
+  string execution_id = 3;
+
+  // Log message
+  string message = 4;
+
+  // Structured data as JSON string
+  // Contains additional context like command, args, exit_code, etc.
+  string data_json = 5;
 }
 
 message CancelRequest {
