@@ -289,12 +289,17 @@ jobs:
           prerelease: false
 
   build-docker:
-    name: Build and Push Container Image
+    name: Build and Push Container Image (${{ matrix.debian_version }})
     runs-on: ubuntu-latest
     needs: [test, validation]
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        debian_version:
+          - trixie
+          - bookworm
 
     steps:
       - name: Checkout code
@@ -343,14 +348,20 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}-${{ matrix.debian_version }}
+            type=semver,pattern={{major}}.{{minor}}-${{ matrix.debian_version }}
+            type=semver,pattern={{major}}-${{ matrix.debian_version }}
+            type=semver,pattern={{version}},enable=${{ matrix.debian_version == 'trixie' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ matrix.debian_version == 'trixie' }}
+            type=semver,pattern={{major}},enable=${{ matrix.debian_version == 'trixie' }}
+            type=ref,event=branch,suffix=-${{ matrix.debian_version }}
+            type=ref,event=pr,suffix=-${{ matrix.debian_version }}
+            type=sha,prefix={{branch}}-,format=short,suffix=-${{ matrix.debian_version }}
+            type=raw,value=latest-${{ matrix.debian_version }},enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.debian_version == 'trixie' }}
 
       - name: Build and push Docker image
         id: build
@@ -365,8 +376,9 @@ jobs:
             VERSION=${{ steps.meta.outputs.VERSION }}
             GIT_COMMIT=${{ steps.meta.outputs.GIT_COMMIT }}
             BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            DEBIAN_VERSION=${{ matrix.debian_version }}
+          cache-from: type=gha,scope=${{ matrix.debian_version }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.debian_version }}
 
       - name: Image digest
         run: echo "Image digest:" ${{ steps.build.outputs.digest }}

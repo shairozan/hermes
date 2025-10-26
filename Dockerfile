@@ -29,6 +29,7 @@ COPY . .
 ARG VERSION=dev
 ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
+ARG DEBIAN_VERSION=trixie
 
 RUN mage proto && \
     mkdir -p bin && \
@@ -37,7 +38,7 @@ RUN mage proto && \
     mage build
 
 # Runtime stage
-FROM debian:trixie-slim
+FROM debian:${DEBIAN_VERSION}-slim
 
 # Install runtime dependencies
 # Docker is required for the container executor
