@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1
 
+# Define ARG before any FROM to make it available globally
+ARG DEBIAN_VERSION=trixie
+
 # Build stage
 FROM golang:1.25.3-bookworm AS builder
 
@@ -29,7 +32,6 @@ COPY . .
 ARG VERSION=dev
 ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
-ARG DEBIAN_VERSION=trixie
 
 RUN mage proto && \
     mkdir -p bin && \
@@ -38,6 +40,8 @@ RUN mage proto && \
     mage build
 
 # Runtime stage
+# Re-declare ARG to use it in this stage
+ARG DEBIAN_VERSION=trixie
 FROM debian:${DEBIAN_VERSION}-slim
 
 # Install runtime dependencies
