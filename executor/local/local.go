@@ -63,8 +63,10 @@ func (l *LocalExecutor) Execute(ctx context.Context, req *executor.ExecutionRequ
 		req.ExecutionID = uuid.New().String()
 	}
 
-	// Create event channel
-	events := make(chan executor.ExecutionEvent, 100)
+	// Create event channel with small buffer
+	// Small buffer allows initial events to be sent without blocking
+	// while ensuring backpressure if consumer falls behind
+	events := make(chan executor.ExecutionEvent, 10)
 
 	// Start execution in goroutine
 	go func() {
@@ -108,6 +110,12 @@ func (l *LocalExecutor) resolveCommand(executionID, command string) (string, boo
 
 // executeLocal handles the full local execution lifecycle
 func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.ExecutionRequest, events chan<- executor.ExecutionEvent) error {
+	// Create a child context for this execution that we control
+	// This ensures all goroutines spawned for this execution can be properly cancelled
+	execCtx, cancel := context.WithCancel(ctx)
+	// DON'T defer cancel here - we need to wait for goroutines to finish first
+	// Cancel is called explicitly at the end after wg.Wait()
+
 	startTime := time.Now()
 
 	// Create workspace directory for this execution
@@ -150,7 +158,7 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	}
 
 	// Send started event
-	l.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
+	l.sendEvent(execCtx, events, req.ExecutionID, executor.ExecutionEvent{
 		ExecutionID: req.ExecutionID,
 		Timestamp:   time.Now().Unix(),
 		Type:        executor.EventContainerStarted,
@@ -179,8 +187,8 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 		})
 	}
 
-	// Execute command
-	cmd := exec.CommandContext(ctx, actualCommand, req.Args...)
+	// Execute command using execution context
+	cmd := exec.CommandContext(execCtx, actualCommand, req.Args...)
 	cmd.Dir = workingDir
 
 	// Set environment variables
@@ -210,23 +218,41 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	// Use channels to ensure streaming goroutines are ready before we wait on the command
+	// This prevents a race where the command finishes before goroutines start reading
+	stdoutReady := make(chan struct{})
+	stderrReady := make(chan struct{})
+
 	// Stream stdout
 	go func() {
 		defer wg.Done()
-		l.streamOutput(ctx, stdout, events, req.ExecutionID, executor.EventStdout)
+		close(stdoutReady) // Signal that this goroutine has started
+		l.streamOutput(execCtx, stdout, events, req.ExecutionID, executor.EventStdout)
 	}()
 
 	// Stream stderr
 	go func() {
 		defer wg.Done()
-		l.streamOutput(ctx, stderr, events, req.ExecutionID, executor.EventStderr)
+		close(stderrReady) // Signal that this goroutine has started
+		l.streamOutput(execCtx, stderr, events, req.ExecutionID, executor.EventStderr)
 	}()
 
-	// Wait for command to complete
+	// Wait for both streaming goroutines to be ready before waiting on command
+	<-stdoutReady
+	<-stderrReady
+
+	// IMPORTANT: We must wait for all reads from pipes to complete BEFORE calling cmd.Wait()
+	// per the exec.Cmd documentation for StdoutPipe()/StderrPipe()
+	// Instead, wait for the command process to exit separately, then wait for streaming to finish
+
+	// Wait for all output to be streamed before calling cmd.Wait()
+	wg.Wait()
+
+	// Now that all reads are complete, we can safely call Wait()
 	err = cmd.Wait()
 
-	// Wait for all output to be streamed before proceeding
-	wg.Wait()
+	// Now that streaming goroutines are done, we can safely proceed
+	// Note: We don't cancel the context yet because we still need to send completion events
 
 	exitCode := 0
 	if err != nil {
@@ -238,7 +264,7 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	}
 
 	// Collect artifacts (REQ-ERR-LOC-002: Continue even if command failed)
-	filesCollected, err := l.collectArtifacts(ctx, workingDir, req.Retain, req.ExecutionID, events)
+	filesCollected, err := l.collectArtifacts(execCtx, workingDir, req.Retain, req.ExecutionID, events)
 	if err != nil {
 		// Log error but continue to send completion event
 		l.logger.Error(req.ExecutionID, "Failed to collect artifacts", err)
@@ -251,10 +277,10 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	l.logger.AuditExecutionComplete(req.ExecutionID, int32(exitCode), runtimeSeconds, filesCollected)
 
 	// Stream buffered audit logs to client
-	l.streamAuditLogs(ctx, events, req.ExecutionID)
+	l.streamAuditLogs(execCtx, events, req.ExecutionID)
 
 	// Send completion event
-	l.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
+	l.sendEvent(execCtx, events, req.ExecutionID, executor.ExecutionEvent{
 		ExecutionID: req.ExecutionID,
 		Timestamp:   time.Now().Unix(),
 		Type:        executor.EventComplete,
@@ -264,6 +290,10 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 			FilesCollected: filesCollected,
 		},
 	})
+
+	// Now that ALL events have been sent, cancel the execution context
+	// This signals any remaining goroutines to exit
+	cancel()
 
 	return nil
 }
@@ -318,13 +348,6 @@ func (l *LocalExecutor) streamOutput(ctx context.Context, reader io.Reader, even
 	lineNum := int32(0)
 
 	for scanner.Scan() {
-		// Check if context is cancelled
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		lineNum++
 		l.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
 			ExecutionID: executionID,
@@ -335,6 +358,11 @@ func (l *LocalExecutor) streamOutput(ctx context.Context, reader io.Reader, even
 				LineNumber: lineNum,
 			},
 		})
+
+		// After sending, check if context is cancelled to exit early if needed
+		if ctx.Err() != nil {
+			return
+		}
 	}
 }
 
