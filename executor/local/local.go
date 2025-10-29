@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -205,14 +206,27 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 
+	// Use WaitGroup to ensure output streams are fully processed
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	// Stream stdout
-	go l.streamOutput(stdout, events, req.ExecutionID, executor.EventStdout)
+	go func() {
+		defer wg.Done()
+		l.streamOutput(stdout, events, req.ExecutionID, executor.EventStdout)
+	}()
 
 	// Stream stderr
-	go l.streamOutput(stderr, events, req.ExecutionID, executor.EventStderr)
+	go func() {
+		defer wg.Done()
+		l.streamOutput(stderr, events, req.ExecutionID, executor.EventStderr)
+	}()
 
 	// Wait for command to complete
 	err = cmd.Wait()
+
+	// Wait for all output to be streamed before proceeding
+	wg.Wait()
 
 	exitCode := 0
 	if err != nil {
