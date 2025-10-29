@@ -25,7 +25,8 @@
       "Bash(GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 VERSION=8f4a165-dirty GIT_COMMIT=8f4a165d484e1d5daa0b047979f04c9cfa2fe559ed BUILD_DATE=2025-10-25T19:53:32Z mage build:*)",
       "Bash(VERSION=\"test-fix\" GIT_COMMIT=\"abc123\" BUILD_DATE=\"2025-10-25T20:00:00Z\" mage build:*)",
       "Bash(git ls-tree:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(HERMES_CONFIG=/tmp/test-hermes-config.yaml HERMES_PORT=50052 timeout:*)"
     ],
     "deny": [],
     "ask": []

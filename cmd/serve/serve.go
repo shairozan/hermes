@@ -18,11 +18,11 @@ import (
 
 // ServeConfig holds the configuration for the serve command
 type ServeConfig struct {
-	ConfigFile    string
-	Address       string
-	Port          int
-	ExecutorMode  string
-	WorkspaceBase string
+	ConfigFile    string `mapstructure:"config"`
+	Address       string `mapstructure:"address"`
+	Port          int    `mapstructure:"port"`
+	ExecutorMode  string `mapstructure:"mode"`
+	WorkspaceBase string `mapstructure:"workspace"`
 }
 
 // Command creates the serve command

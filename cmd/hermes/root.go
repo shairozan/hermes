@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pharmalytica/hermes/cmd/serve"
 	versionCmd "github.com/pharmalytica/hermes/cmd/version"
@@ -22,11 +23,7 @@ func Command() (*cobra.Command, error) {
 in containerized environments with file injection and artifact collection.`,
 		Version: versionInfo.Short(),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Setup viper
-			viper.SetEnvPrefix("HERMES")
-			viper.AutomaticEnv()
-
-			// Read config file if specified
+			// Read config file if specified (from flag or env)
 			if configFile := viper.GetString("config"); configFile != "" {
 				viper.SetConfigFile(configFile)
 				if err := viper.ReadInConfig(); err != nil {
@@ -66,6 +63,14 @@ func attributes(c *cobra.Command) {
 }
 
 func main() {
+	// Setup Viper configuration BEFORE any command execution
+	// This ensures environment variables are properly read
+	viper.SetEnvPrefix("HERMES")
+	viper.AutomaticEnv()
+	// Replace underscores in env vars with dots in viper keys
+	// This allows HERMES_CONFIG to map to "config" key
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
 	cmd, err := Command()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating command: %v\n", err)
