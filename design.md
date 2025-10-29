@@ -96,7 +96,10 @@ message ExecutionRequest {
   string container_image = 6;
 
   // Environment variables to set in the container
-  // Example: {"OMP_NUM_THREADS": "4", "NONMEM_LICENSE_FILE": "/workspace/license.lic"}
+  // Supports workspace path macros for referencing injected files
+  // Macros:
+  //   ${WORKSPACE} or ${WORKSPACE_ROOT} - expands to absolute workspace path
+  // Example: {"OMP_NUM_THREADS": "4", "NONMEM_LICENSE_FILE": "${WORKSPACE}/license.lic"}
   map<string, string> environment = 7;
 
   // Resource limits (optional)
@@ -1265,6 +1268,66 @@ Each execution request gets an isolated workspace:
 - Used as working directory for command
 - Cleaned up after files collected
 - Isolated per `execution_id`
+
+#### Workspace Path Macros
+
+To reference injected files in environment variables and command arguments without knowing the absolute workspace path, Hermes supports **workspace macros** that are expanded at execution time.
+
+**Supported Macros**:
+- `${WORKSPACE}` - Expands to the absolute workspace path
+- `${WORKSPACE_ROOT}` - Alias for `${WORKSPACE}` (for clarity)
+
+**Usage Examples**:
+
+```json
+{
+  "command": "nonmem",
+  "args": ["model.mod", "model.lst"],
+  "files": {
+    "model.mod": "<base64 content>",
+    "data.csv": "<base64 content>",
+    "nonmem.lic": "<base64 content>"
+  },
+  "environment": {
+    "NMLICENSE": "${WORKSPACE}/nonmem.lic",
+    "DATA_FILE": "${WORKSPACE}/data.csv"
+  }
+}
+```
+
+**How It Works**:
+
+1. **File Injection**: Files from request are written to workspace
+   - Example: `/tmp/hermes-workspaces/job-12345/workspace/nonmem.lic`
+
+2. **Macro Expansion**: Before executing command, macros are expanded
+   - `${WORKSPACE}/nonmem.lic` → `/tmp/hermes-workspaces/job-12345/workspace/nonmem.lic`
+
+3. **Execution**: Command runs with expanded values
+   - Environment variable `NMLICENSE` contains the actual path
+
+**Benefits**:
+- **Portability**: Same request works across local and Docker executors
+- **Simplicity**: No need to know internal workspace structure
+- **Clarity**: Explicit about what paths refer to workspace files
+
+**Fallback Behavior**:
+If a path doesn't use macros, Hermes treats it as follows:
+- **Relative paths**: Resolved relative to the workspace (working directory)
+- **Absolute paths**: Used as-is (but may fail if path doesn't exist)
+
+**Example - Relative Path Fallback**:
+```json
+{
+  "environment": {
+    "NMLICENSE": "nonmem.lic"  // Relative - resolves to workspace/nonmem.lic
+  }
+}
+```
+
+This works because the command runs with `working_dir` set to the workspace, so relative paths automatically resolve within the workspace.
+
+**Recommendation**: Use explicit macros (`${WORKSPACE}/file`) for clarity, especially for environment variables that may be used by tools expecting absolute paths.
 
 #### Container Reuse
 

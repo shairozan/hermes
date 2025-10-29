@@ -172,6 +172,33 @@ func (d *DockerExecutor) executeContainer(ctx context.Context, req *executor.Exe
 	return nil
 }
 
+// expandMacros expands workspace macros in a string
+// Supported macros:
+//   ${WORKSPACE} or ${WORKSPACE_ROOT} - expands to the workspace path (container path)
+func expandMacros(value, workspacePath string) string {
+	result := strings.ReplaceAll(value, "${WORKSPACE}", workspacePath)
+	result = strings.ReplaceAll(result, "${WORKSPACE_ROOT}", workspacePath)
+	return result
+}
+
+// expandEnvironmentMacros expands macros in all environment variable values
+func expandEnvironmentMacros(env map[string]string, workspacePath string) map[string]string {
+	expanded := make(map[string]string, len(env))
+	for k, v := range env {
+		expanded[k] = expandMacros(v, workspacePath)
+	}
+	return expanded
+}
+
+// expandArgsMacros expands macros in command arguments
+func expandArgsMacros(args []string, workspacePath string) []string {
+	expanded := make([]string, len(args))
+	for i, arg := range args {
+		expanded[i] = expandMacros(arg, workspacePath)
+	}
+	return expanded
+}
+
 // pullImage pulls the container image if not present
 func (d *DockerExecutor) pullImage(ctx context.Context, imageName string) error {
 	reader, err := d.client.ImagePull(ctx, imageName, image.PullOptions{})
@@ -187,12 +214,16 @@ func (d *DockerExecutor) pullImage(ctx context.Context, imageName string) error 
 
 // createContainer creates a new container with the specified configuration
 func (d *DockerExecutor) createContainer(ctx context.Context, req *executor.ExecutionRequest) (string, error) {
+	// Expand macros in arguments and environment using container's working directory
+	expandedArgs := expandArgsMacros(req.Args, req.WorkingDir)
+	expandedEnv := expandEnvironmentMacros(req.Environment, req.WorkingDir)
+
 	// Build command
-	cmd := append([]string{req.Command}, req.Args...)
+	cmd := append([]string{req.Command}, expandedArgs...)
 
 	// Build environment
-	env := make([]string, 0, len(req.Environment))
-	for k, v := range req.Environment {
+	env := make([]string, 0, len(expandedEnv))
+	for k, v := range expandedEnv {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 

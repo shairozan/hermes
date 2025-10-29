@@ -108,6 +108,33 @@ func (l *LocalExecutor) resolveCommand(executionID, command string) (string, boo
 	return command, false, nil
 }
 
+// expandMacros expands workspace macros in a string
+// Supported macros:
+//   ${WORKSPACE} or ${WORKSPACE_ROOT} - expands to the absolute workspace path
+func expandMacros(value, workspacePath string) string {
+	result := strings.ReplaceAll(value, "${WORKSPACE}", workspacePath)
+	result = strings.ReplaceAll(result, "${WORKSPACE_ROOT}", workspacePath)
+	return result
+}
+
+// expandEnvironmentMacros expands macros in all environment variable values
+func expandEnvironmentMacros(env map[string]string, workspacePath string) map[string]string {
+	expanded := make(map[string]string, len(env))
+	for k, v := range env {
+		expanded[k] = expandMacros(v, workspacePath)
+	}
+	return expanded
+}
+
+// expandArgsMacros expands macros in command arguments
+func expandArgsMacros(args []string, workspacePath string) []string {
+	expanded := make([]string, len(args))
+	for i, arg := range args {
+		expanded[i] = expandMacros(arg, workspacePath)
+	}
+	return expanded
+}
+
 // executeLocal handles the full local execution lifecycle
 func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.ExecutionRequest, events chan<- executor.ExecutionEvent) error {
 	// Create a child context for this execution that we control
@@ -177,23 +204,27 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	// Resolve command (check for overrides) - REQ-AUD-LOC-003
 	actualCommand, overridden, _ := l.resolveCommand(req.ExecutionID, req.Command)
 
+	// Expand macros in arguments and environment variables
+	expandedArgs := expandArgsMacros(req.Args, workingDir)
+	expandedEnv := expandEnvironmentMacros(req.Environment, workingDir)
+
 	// Audit execution start
-	l.logger.AuditExecution(req.ExecutionID, actualCommand, req.Args)
+	l.logger.AuditExecution(req.ExecutionID, actualCommand, expandedArgs)
 	if !overridden {
 		// Also log original command if no override
 		l.logger.InfoWithData(req.ExecutionID, "Executing command", map[string]interface{}{
 			"command": actualCommand,
-			"args":    req.Args,
+			"args":    expandedArgs,
 		})
 	}
 
 	// Execute command using execution context
-	cmd := exec.CommandContext(execCtx, actualCommand, req.Args...)
+	cmd := exec.CommandContext(execCtx, actualCommand, expandedArgs...)
 	cmd.Dir = workingDir
 
-	// Set environment variables
+	// Set environment variables (with expanded macros)
 	cmd.Env = os.Environ()
-	for k, v := range req.Environment {
+	for k, v := range expandedEnv {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
