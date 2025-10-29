@@ -51,8 +51,10 @@ func (d *DockerExecutor) Execute(ctx context.Context, req *executor.ExecutionReq
 		req.ExecutionID = uuid.New().String()
 	}
 
-	// Create event channel
-	events := make(chan executor.ExecutionEvent, 100)
+	// Create event channel with small buffer
+	// Small buffer allows initial events to be sent without blocking
+	// while ensuring backpressure if consumer falls behind
+	events := make(chan executor.ExecutionEvent, 10)
 
 	// Create cancellable context for this execution
 	execCtx, cancel := context.WithCancel(ctx)
@@ -72,7 +74,7 @@ func (d *DockerExecutor) Execute(ctx context.Context, req *executor.ExecutionReq
 		}()
 
 		if err := d.executeContainer(execCtx, req, events); err != nil {
-			d.sendEvent(events, req.ExecutionID, executor.ExecutionEvent{
+			d.sendEvent(execCtx, events, req.ExecutionID, executor.ExecutionEvent{
 				ExecutionID: req.ExecutionID,
 				Timestamp:   time.Now().Unix(),
 				Type:        executor.EventError,
@@ -115,7 +117,7 @@ func (d *DockerExecutor) executeContainer(ctx context.Context, req *executor.Exe
 	}()
 
 	// Send container started event
-	d.sendEvent(events, req.ExecutionID, executor.ExecutionEvent{
+	d.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
 		ExecutionID: req.ExecutionID,
 		Timestamp:   time.Now().Unix(),
 		Type:        executor.EventContainerStarted,
@@ -155,7 +157,7 @@ func (d *DockerExecutor) executeContainer(ctx context.Context, req *executor.Exe
 		}
 
 		// Send completion event
-		d.sendEvent(events, req.ExecutionID, executor.ExecutionEvent{
+		d.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
 			ExecutionID: req.ExecutionID,
 			Timestamp:   time.Now().Unix(),
 			Type:        executor.EventComplete,
@@ -299,7 +301,7 @@ func (d *DockerExecutor) streamLogs(ctx context.Context, containerID, executionI
 			}
 
 			stdoutLineNum++
-			d.sendEvent(events, executionID, executor.ExecutionEvent{
+			d.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
 				ExecutionID: executionID,
 				Timestamp:   time.Now().Unix(),
 				Type:        executor.EventStdout,
@@ -366,7 +368,7 @@ func (d *DockerExecutor) collectArtifacts(ctx context.Context, containerID, work
 			}
 
 			// Send file chunk event
-			d.sendEvent(events, executionID, executor.ExecutionEvent{
+			d.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
 				ExecutionID: executionID,
 				Timestamp:   time.Now().Unix(),
 				Type:        executor.EventFileChunk,
@@ -386,11 +388,13 @@ func (d *DockerExecutor) collectArtifacts(ctx context.Context, containerID, work
 }
 
 // sendEvent sends an event to the channel
-func (d *DockerExecutor) sendEvent(events chan<- executor.ExecutionEvent, _ string, event executor.ExecutionEvent) {
+func (d *DockerExecutor) sendEvent(ctx context.Context, events chan<- executor.ExecutionEvent, _ string, event executor.ExecutionEvent) {
 	select {
 	case events <- event:
-	default:
-		// Event channel full, log warning (would need logger injected)
+		// Event sent successfully
+	case <-ctx.Done():
+		// Context cancelled, silently return
+		// No logger available in Docker executor yet
 	}
 }
 
