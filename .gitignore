@@ -174,3 +174,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+
+# Exclude the gRPC postman collection
+docs/hermes.postman_collection.json

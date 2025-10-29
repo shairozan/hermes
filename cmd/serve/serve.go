@@ -67,6 +67,34 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Log configuration on startup
+	if cfg.ConfigFile != "" {
+		fmt.Printf("Loaded configuration from: %s\n", cfg.ConfigFile)
+		fmt.Printf("Server configuration:\n")
+		fmt.Printf("  Address: %s\n", appConfig.Server.Address)
+		fmt.Printf("  Port: %d\n", appConfig.Server.Port)
+		fmt.Printf("Executor configuration:\n")
+		fmt.Printf("  Mode: %s\n", appConfig.Executor.Mode)
+		if appConfig.Executor.Mode == "local" {
+			fmt.Printf("  Workspace Base: %s\n", appConfig.Executor.Local.WorkspaceBase)
+		}
+		if len(appConfig.Overrides.Commands) > 0 {
+			fmt.Printf("Command overrides:\n")
+			for _, override := range appConfig.Overrides.Commands {
+				fmt.Printf("  %s -> %s (%s)\n", override.Pattern, override.Target, override.Description)
+			}
+		}
+		if len(appConfig.Overrides.Environment) > 0 {
+			fmt.Printf("Environment overrides:\n")
+			for k, v := range appConfig.Overrides.Environment {
+				fmt.Printf("  %s=%s\n", k, v)
+			}
+		}
+		fmt.Println()
+	} else {
+		fmt.Println("Using default configuration (no config file specified)")
+	}
+
 	// Override config with command line flags if provided
 	if cmd.Flags().Changed("address") {
 		appConfig.Server.Address = cfg.Address
@@ -82,7 +110,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create executor based on configuration
-	exec, err := server.NewExecutor(&appConfig.Executor)
+	exec, err := server.NewExecutor(&appConfig.Executor, &appConfig.Overrides)
 	if err != nil {
 		return fmt.Errorf("failed to create executor: %w", err)
 	}

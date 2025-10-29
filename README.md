@@ -39,6 +39,17 @@ mage build
 mage test
 ```
 
+### Testing with Postman
+
+For manual testing of gRPC endpoints, we provide a comprehensive Postman collection:
+
+```bash
+# Import the collection
+docs/hermes.postman_collection.json
+```
+
+See [docs/POSTMAN_TESTING.md](./docs/POSTMAN_TESTING.md) for detailed setup instructions and [docs/postman-examples.md](./docs/postman-examples.md) for ready-to-use request examples.
+
 ## Development
 
 See [CLAUDE.md](./CLAUDE.md) for development guidelines and architecture patterns.
