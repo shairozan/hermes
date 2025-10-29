@@ -71,7 +71,7 @@ func (l *LocalExecutor) Execute(ctx context.Context, req *executor.ExecutionRequ
 		defer close(events)
 
 		if err := l.executeLocal(ctx, req, events); err != nil {
-			l.sendEvent(events, req.ExecutionID, executor.ExecutionEvent{
+			l.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
 				ExecutionID: req.ExecutionID,
 				Timestamp:   time.Now().Unix(),
 				Type:        executor.EventError,
@@ -150,7 +150,7 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	}
 
 	// Send started event
-	l.sendEvent(events, req.ExecutionID, executor.ExecutionEvent{
+	l.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
 		ExecutionID: req.ExecutionID,
 		Timestamp:   time.Now().Unix(),
 		Type:        executor.EventContainerStarted,
@@ -213,13 +213,13 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	// Stream stdout
 	go func() {
 		defer wg.Done()
-		l.streamOutput(stdout, events, req.ExecutionID, executor.EventStdout)
+		l.streamOutput(ctx, stdout, events, req.ExecutionID, executor.EventStdout)
 	}()
 
 	// Stream stderr
 	go func() {
 		defer wg.Done()
-		l.streamOutput(stderr, events, req.ExecutionID, executor.EventStderr)
+		l.streamOutput(ctx, stderr, events, req.ExecutionID, executor.EventStderr)
 	}()
 
 	// Wait for command to complete
@@ -238,7 +238,7 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	}
 
 	// Collect artifacts (REQ-ERR-LOC-002: Continue even if command failed)
-	filesCollected, err := l.collectArtifacts(workingDir, req.Retain, req.ExecutionID, events)
+	filesCollected, err := l.collectArtifacts(ctx, workingDir, req.Retain, req.ExecutionID, events)
 	if err != nil {
 		// Log error but continue to send completion event
 		l.logger.Error(req.ExecutionID, "Failed to collect artifacts", err)
@@ -251,10 +251,10 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	l.logger.AuditExecutionComplete(req.ExecutionID, int32(exitCode), runtimeSeconds, filesCollected)
 
 	// Stream buffered audit logs to client
-	l.streamAuditLogs(events, req.ExecutionID)
+	l.streamAuditLogs(ctx, events, req.ExecutionID)
 
 	// Send completion event
-	l.sendEvent(events, req.ExecutionID, executor.ExecutionEvent{
+	l.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
 		ExecutionID: req.ExecutionID,
 		Timestamp:   time.Now().Unix(),
 		Type:        executor.EventComplete,
@@ -313,13 +313,20 @@ func (l *LocalExecutor) writeFiles(baseDir string, files map[string][]byte) erro
 }
 
 // streamOutput streams output from a reader to events
-func (l *LocalExecutor) streamOutput(reader io.Reader, events chan<- executor.ExecutionEvent, executionID string, eventType executor.EventType) {
+func (l *LocalExecutor) streamOutput(ctx context.Context, reader io.Reader, events chan<- executor.ExecutionEvent, executionID string, eventType executor.EventType) {
 	scanner := bufio.NewScanner(reader)
 	lineNum := int32(0)
 
 	for scanner.Scan() {
+		// Check if context is cancelled
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		lineNum++
-		l.sendEvent(events, executionID, executor.ExecutionEvent{
+		l.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
 			ExecutionID: executionID,
 			Timestamp:   time.Now().Unix(),
 			Type:        eventType,
@@ -332,7 +339,7 @@ func (l *LocalExecutor) streamOutput(reader io.Reader, events chan<- executor.Ex
 }
 
 // collectArtifacts collects files matching retain patterns
-func (l *LocalExecutor) collectArtifacts(baseDir string, patterns []string, executionID string, events chan<- executor.ExecutionEvent) (int32, error) {
+func (l *LocalExecutor) collectArtifacts(ctx context.Context, baseDir string, patterns []string, executionID string, events chan<- executor.ExecutionEvent) (int32, error) {
 	if len(patterns) == 0 {
 		return 0, nil
 	}
@@ -365,7 +372,7 @@ func (l *LocalExecutor) collectArtifacts(baseDir string, patterns []string, exec
 			}
 
 			// Send file chunk event
-			l.sendEvent(events, executionID, executor.ExecutionEvent{
+			l.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
 				ExecutionID: executionID,
 				Timestamp:   time.Now().Unix(),
 				Type:        executor.EventFileChunk,
@@ -385,17 +392,19 @@ func (l *LocalExecutor) collectArtifacts(baseDir string, patterns []string, exec
 }
 
 // sendEvent sends an event to the channel
-func (l *LocalExecutor) sendEvent(events chan<- executor.ExecutionEvent, _ string, event executor.ExecutionEvent) {
+func (l *LocalExecutor) sendEvent(ctx context.Context, events chan<- executor.ExecutionEvent, executionID string, event executor.ExecutionEvent) {
 	select {
 	case events <- event:
-	default:
-		// Event channel full, log warning (would need logger injected)
+		// Event sent successfully
+	case <-ctx.Done():
+		// Context cancelled, log and return
+		l.logger.Warning(executionID, "Event send cancelled due to context cancellation")
 	}
 }
 
 // streamAuditLogs streams buffered audit logs to the client
 // This provides the full audit trail for GxP compliance
-func (l *LocalExecutor) streamAuditLogs(events chan<- executor.ExecutionEvent, executionID string) {
+func (l *LocalExecutor) streamAuditLogs(ctx context.Context, events chan<- executor.ExecutionEvent, executionID string) {
 	logs := l.logger.GetBufferedLogs(executionID)
 
 	for _, logEntry := range logs {
@@ -407,7 +416,7 @@ func (l *LocalExecutor) streamAuditLogs(events chan<- executor.ExecutionEvent, e
 			}
 		}
 
-		l.sendEvent(events, executionID, executor.ExecutionEvent{
+		l.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
 			ExecutionID: executionID,
 			Timestamp:   time.Now().Unix(),
 			Type:        executor.EventAuditLog,
