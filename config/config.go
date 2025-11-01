@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -18,8 +19,9 @@ type Config struct {
 
 // ServerConfig holds server-specific configuration
 type ServerConfig struct {
-	Address string `yaml:"address"`
-	Port    int    `yaml:"port"`
+	Address        string `yaml:"address"`
+	Port           int    `yaml:"port"`
+	MaxMessageSize string `yaml:"max_message_size"` // e.g., "1GB", "512MB", "4GB"
 }
 
 // ExecutorConfig holds executor-specific configuration
@@ -88,6 +90,57 @@ func (p *PathOverride) Match(path string) (bool, string) {
 	return true, p.Target
 }
 
+// ParseSize parses a size string (e.g., "1GB", "512MB", "16GB") into bytes
+func ParseSize(size string) (int, error) {
+	if size == "" {
+		return 1024 * 1024 * 1024, nil // Default 1GB
+	}
+
+	size = strings.TrimSpace(strings.ToUpper(size))
+
+	// Extract number and unit
+	var numStr string
+	var unit string
+
+	for i, c := range size {
+		if c >= '0' && c <= '9' || c == '.' {
+			numStr += string(c)
+		} else {
+			unit = size[i:]
+			break
+		}
+	}
+
+	if numStr == "" {
+		return 0, fmt.Errorf("invalid size format: %s (expected format: 1GB, 512MB, etc.)", size)
+	}
+
+	num, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size number: %s", numStr)
+	}
+
+	multiplier := int64(1)
+	switch unit {
+	case "B", "":
+		multiplier = 1
+	case "KB":
+		multiplier = 1024
+	case "MB":
+		multiplier = 1024 * 1024
+	case "GB":
+		multiplier = 1024 * 1024 * 1024
+	case "TB":
+		multiplier = 1024 * 1024 * 1024 * 1024
+	default:
+		return 0, fmt.Errorf("invalid size unit: %s (valid units: B, KB, MB, GB, TB)", unit)
+	}
+
+	result := int64(num * float64(multiplier))
+
+	return int(result), nil
+}
+
 // Load loads configuration from a YAML file
 func Load(path string) (*Config, error) {
 	if path == "" {
@@ -116,8 +169,9 @@ func Load(path string) (*Config, error) {
 func defaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Address: "0.0.0.0",
-			Port:    50051,
+			Address:        "0.0.0.0",
+			Port:           50051,
+			MaxMessageSize: "1GB", // Default 1GB message size
 		},
 		Executor: ExecutorConfig{
 			Mode: "local",
@@ -196,6 +250,7 @@ func Example() string {
 server:
   address: "0.0.0.0"
   port: 50051
+  max_message_size: "1GB"  # Maximum gRPC message size (supports: KB, MB, GB, TB)
 
 overrides:
   # Command path overrides

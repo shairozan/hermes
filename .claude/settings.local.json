@@ -26,7 +26,8 @@
       "Bash(VERSION=\"test-fix\" GIT_COMMIT=\"abc123\" BUILD_DATE=\"2025-10-25T20:00:00Z\" mage build:*)",
       "Bash(git ls-tree:*)",
       "Bash(cat:*)",
-      "Bash(HERMES_CONFIG=/tmp/test-hermes-config.yaml HERMES_PORT=50052 timeout:*)"
+      "Bash(HERMES_CONFIG=/tmp/test-hermes-config.yaml HERMES_PORT=50052 timeout:*)",
+      "Bash(./bin/hermes serve:*)"
     ],
     "deny": [],
     "ask": []

@@ -18,11 +18,12 @@ import (
 
 // ServeConfig holds the configuration for the serve command
 type ServeConfig struct {
-	ConfigFile    string `mapstructure:"config"`
-	Address       string `mapstructure:"address"`
-	Port          int    `mapstructure:"port"`
-	ExecutorMode  string `mapstructure:"mode"`
-	WorkspaceBase string `mapstructure:"workspace"`
+	ConfigFile     string `mapstructure:"config"`
+	Address        string `mapstructure:"address"`
+	Port           int    `mapstructure:"port"`
+	MaxMessageSize string `mapstructure:"max_message_size"`
+	ExecutorMode   string `mapstructure:"mode"`
+	WorkspaceBase  string `mapstructure:"workspace"`
 }
 
 // Command creates the serve command
@@ -47,6 +48,7 @@ func attributes(c *cobra.Command) {
 	c.Flags().StringP("config", "c", "", "Path to configuration file")
 	c.Flags().String("address", "0.0.0.0", "Address to bind the server to")
 	c.Flags().IntP("port", "p", 50051, "Port to bind the server to")
+	c.Flags().String("max-message-size", "1GB", "Maximum gRPC message size (e.g., 1GB, 512MB, 16GB)")
 	c.Flags().StringP("mode", "m", "local", "Executor mode (local, docker, file-server, scheduler)")
 	c.Flags().String("workspace", "", "Workspace base directory (for local mode)")
 
@@ -102,6 +104,9 @@ func run(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Changed("port") {
 		appConfig.Server.Port = cfg.Port
 	}
+	if cmd.Flags().Changed("max-message-size") {
+		appConfig.Server.MaxMessageSize = cfg.MaxMessageSize
+	}
 	if cmd.Flags().Changed("mode") {
 		appConfig.Executor.Mode = cfg.ExecutorMode
 	}
@@ -121,8 +126,19 @@ func run(cmd *cobra.Command, args []string) error {
 	// Log the executor mode
 	fmt.Printf("Executor mode: %s\n", appConfig.Executor.Mode)
 
-	// Create gRPC server
-	grpcServer := grpc.NewServer()
+	// Parse max message size from config
+	maxMsgSize, err := config.ParseSize(appConfig.Server.MaxMessageSize)
+	if err != nil {
+		return fmt.Errorf("invalid max_message_size: %w", err)
+	}
+	fmt.Printf("Max gRPC message size: %s (%d bytes)\n", appConfig.Server.MaxMessageSize, maxMsgSize)
+
+	// Create gRPC server with configured message size limit
+	// This allows large file transfers (datasets, models, etc.)
+	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(maxMsgSize),
+		grpc.MaxSendMsgSize(maxMsgSize),
+	)
 	pb.RegisterHermesServer(grpcServer, hermesServer)
 
 	// Create listener

@@ -213,6 +213,49 @@ message DockerStatus {
 }
 ```
 
+### Message Size Limits
+
+The Hermes gRPC server supports **configurable message sizes** for both receiving and sending. The default is **1GB**, but this can be customized based on your workload requirements.
+
+**Configuration Options**:
+
+1. **Environment Variable**: `HERMES_MAX_MESSAGE_SIZE=16GB`
+2. **Command Line Flag**: `--max-message-size 16GB`
+3. **Config File**:
+```yaml
+server:
+  max_message_size: "16GB"  # Supports: KB, MB, GB, TB
+```
+
+**Implementation**:
+```go
+maxMsgSize, _ := config.ParseSize(cfg.Server.MaxMessageSize)
+grpc.NewServer(
+    grpc.MaxRecvMsgSize(maxMsgSize),
+    grpc.MaxSendMsgSize(maxMsgSize),
+)
+```
+
+**Why Configurable Large Sizes?**
+- **Large Datasets**: Scientific computing often involves multi-megabyte or gigabyte datasets (e.g., clinical trial data, simulation results)
+- **Model Files**: Large model files with extensive data tables embedded
+- **License Files**: Some commercial software has large license files
+- **Output Collection**: Result files can be substantial (e.g., NONMEM `.ext` files with thousands of iterations)
+- **Batch Operations**: Multiple files bundled in a single request
+
+**Design Considerations**:
+- **gRPC default is 4MB**, which is insufficient for scientific workflows
+- **1GB default** strikes a balance between usability and resource protection for typical use cases
+- **16GB+ support** available for workflows with very large datasets
+- For files larger than the configured limit, clients should consider splitting requests or using external storage with file references
+- Streaming responses allow sending results larger than the limit through multiple message chunks
+
+**Memory Impact**:
+- Each concurrent request can consume up to the configured message size for input processing
+- Server should be provisioned with adequate memory based on `max_concurrent_executions × max_message_size`
+- **Example**: 10 concurrent executions with 1GB limit = minimum 10GB memory recommended
+- **Example**: 10 concurrent executions with 16GB limit = minimum 160GB memory recommended
+
 ## Configuration-Based Overrides
 
 The Hermes service MAY accept a configuration file that defines command and path overrides. This allows the service to transparently redirect client requests to container-specific locations without the client needing to know container internals.
@@ -1425,6 +1468,8 @@ max_concurrent_executions: 4
 
 server:
   address: "0.0.0.0:50051"
+  # gRPC message size limit: 1GB (allows large file transfers)
+  max_message_size: 1073741824  # 1GB
   tls:
     enabled: true
     cert_file: "/etc/hermes/server.crt"
