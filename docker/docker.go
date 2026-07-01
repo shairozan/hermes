@@ -7,11 +7,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -347,75 +349,125 @@ func (d *DockerExecutor) streamLogs(ctx context.Context, containerID, executionI
 	return nil
 }
 
-// collectArtifacts collects files matching retain patterns from the container
+// collectArtifacts collects files matching retain patterns from the container.
+//
+// The working directory is copied out of the container once as a tar stream and
+// each regular-file entry is filtered against the retain patterns using
+// doublestar matching. This makes glob expansion image-agnostic (no shell or
+// find required inside the container) and gives Docker mode the same semantics
+// as the local executor, including globstar (**) patterns such as
+// "output/**/*.json".
 func (d *DockerExecutor) collectArtifacts(ctx context.Context, containerID, workingDir string, patterns []string, executionID string, events chan<- executor.ExecutionEvent) (int32, error) {
 	if len(patterns) == 0 {
 		return 0, nil
 	}
 
+	// Copy the entire working directory out of the container. Docker roots the
+	// resulting tar entries at the base name of workingDir (e.g. "/workspace"
+	// yields entries like "workspace/out/a.json"), so that component is stripped
+	// to obtain paths relative to the working directory.
+	reader, _, err := d.client.CopyFromContainer(ctx, containerID, workingDir)
+	if err != nil {
+		// The working directory may be missing or empty; treat as no artifacts.
+		return 0, nil
+	}
+	defer reader.Close()
+
+	stripPrefix := path.Base(strings.TrimRight(filepath.ToSlash(workingDir), "/"))
+
+	tr := tar.NewReader(reader)
+	return matchTarArtifacts(tr, stripPrefix, patterns, func(relPath string, content []byte, size int64) error {
+		d.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
+			ExecutionID: executionID,
+			Timestamp:   time.Now().Unix(),
+			Type:        executor.EventFileChunk,
+			Data: &executor.FileChunkData{
+				Path:      relPath,
+				Chunk:     content,
+				IsFinal:   true,
+				TotalSize: size,
+			},
+		})
+		return nil
+	})
+}
+
+// matchTarArtifacts walks the regular-file entries of a tar stream, computes
+// each entry's path relative to the working directory (by dropping the
+// stripPrefix component Docker prepends), and invokes emit for every file that
+// matches at least one retain pattern via doublestar. Each matching file is
+// emitted at most once even if it matches multiple patterns. It is separated
+// from the Docker client so it can be unit-tested without a running daemon.
+func matchTarArtifacts(tr *tar.Reader, stripPrefix string, patterns []string, emit func(relPath string, content []byte, size int64) error) (int32, error) {
 	filesCollected := int32(0)
+	seen := make(map[string]struct{})
 
-	// For each pattern, we need to:
-	// 1. Find matching files in the container
-	// 2. Extract them using CopyFromContainer
-	// 3. Stream them as FileChunk events
-
-	// This is a simplified implementation - a full implementation would:
-	// - Execute a find command in the container to match glob patterns
-	// - Extract matching files
-	// - Stream them in chunks
-
-	// For now, we'll implement a basic version that copies the working directory
-	// and filters files locally
-
-	for _, pattern := range patterns {
-		// Copy from container
-		reader, _, err := d.client.CopyFromContainer(ctx, containerID, filepath.Join(workingDir, pattern))
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
-			// Pattern might not match any files, which is ok
+			return filesCollected, fmt.Errorf("failed to read tar: %w", err)
+		}
+
+		if hdr.Typeflag != tar.TypeReg {
 			continue
 		}
-		defer reader.Close()
 
-		// Read tar archive
-		tr := tar.NewReader(reader)
-		for {
-			hdr, err := tr.Next()
-			if err == io.EOF {
+		relPath := relativeArtifactPath(hdr.Name, stripPrefix)
+		if relPath == "" {
+			continue
+		}
+		if _, ok := seen[relPath]; ok {
+			continue
+		}
+
+		matched := false
+		for _, pattern := range patterns {
+			ok, err := doublestar.Match(pattern, relPath)
+			if err != nil {
+				return filesCollected, fmt.Errorf("failed to match pattern %s: %w", pattern, err)
+			}
+			if ok {
+				matched = true
 				break
 			}
-			if err != nil {
-				return filesCollected, fmt.Errorf("failed to read tar: %w", err)
-			}
-
-			if hdr.Typeflag != tar.TypeReg {
-				continue
-			}
-
-			// Read file content
-			content, err := io.ReadAll(tr)
-			if err != nil {
-				return filesCollected, fmt.Errorf("failed to read file content: %w", err)
-			}
-
-			// Send file chunk event
-			d.sendEvent(ctx, events, executionID, executor.ExecutionEvent{
-				ExecutionID: executionID,
-				Timestamp:   time.Now().Unix(),
-				Type:        executor.EventFileChunk,
-				Data: &executor.FileChunkData{
-					Path:      hdr.Name,
-					Chunk:     content,
-					IsFinal:   true,
-					TotalSize: hdr.Size,
-				},
-			})
-
-			filesCollected++
 		}
+		if !matched {
+			continue
+		}
+
+		content, err := io.ReadAll(tr)
+		if err != nil {
+			return filesCollected, fmt.Errorf("failed to read file content: %w", err)
+		}
+
+		seen[relPath] = struct{}{}
+		if err := emit(relPath, content, hdr.Size); err != nil {
+			return filesCollected, err
+		}
+		filesCollected++
 	}
 
 	return filesCollected, nil
+}
+
+// relativeArtifactPath normalizes a tar entry name to forward slashes and drops
+// the leading stripPrefix component (the working-directory base name Docker
+// prepends), yielding the path relative to the working directory. It returns ""
+// for entries that are the working directory itself or fall outside it.
+func relativeArtifactPath(name, stripPrefix string) string {
+	rel := strings.TrimPrefix(filepath.ToSlash(name), "/")
+	if stripPrefix != "" && stripPrefix != "." {
+		switch {
+		case rel == stripPrefix:
+			return ""
+		case strings.HasPrefix(rel, stripPrefix+"/"):
+			rel = rel[len(stripPrefix)+1:]
+		}
+	}
+	return strings.TrimRight(rel, "/")
 }
 
 // sendEvent sends an event to the channel

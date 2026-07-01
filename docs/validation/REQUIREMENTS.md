@@ -247,6 +247,44 @@ Prevents disk space exhaustion from temporary workspaces.
 
 ---
 
+#### REQ-FILE-LOC-005: Recursive Glob Pattern Support
+**Priority**: Critical
+**GAMP Category**: GxP Critical
+
+**Requirement**:
+The system SHALL support globstar (`**`) retain patterns that match files
+recursively across directory levels (e.g. `output/**/*.json`), in addition to
+standard single-star (`*`) globbing. Matching behavior SHALL be identical across
+the local and Docker execution modes.
+
+**Rationale**:
+Clients orchestrating PKPD runs cannot predict the depth of result directories.
+Recursive globbing lets a single retain pattern capture nested artifacts without
+enumerating every subdirectory, simplifying client orchestration.
+
+**Acceptance Criteria**:
+- `**` matches zero or more intermediate path segments
+- Single-star `*` continues to match within a single path segment only
+- Nested files selected by `**` are streamed as `FileChunk` events
+- Non-matching files are ignored
+- Local and Docker modes produce equivalent results for the same patterns
+- Config `retain_paths` / `commands` override patterns also support `**`
+
+**Test Strategy**:
+- Local: inject nested files, retain `out/**/*.json`, verify recursive matches
+  and non-matches (`TestLocalExecutorGlobstarCollection`)
+- Docker: filter an in-memory container tar with globstar patterns, verifying
+  prefix stripping and recursive matching without a daemon
+  (`TestMatchTarArtifactsGlobstar`)
+- Config: verify `PathOverride`/`CommandOverride` globstar matching
+  (`TestOverrideGlobstarMatch`)
+
+**Risk**: High - Determines which results are returned to the client
+
+**CFR 21 Part 11 Link**: §11.10(c) - Accurate reproduction of records
+
+---
+
 ### AUD-LOC: Audit Trail (Local Mode)
 
 #### REQ-AUD-LOC-001: Execution Event Correlation
@@ -618,6 +656,7 @@ Per CLAUDE.md: "Boundaries for most testing should limit to 'Are we calling the 
 | REQ-FILE-LOC-002 | Security | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-FILE-LOC-003 | File Mgmt | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-FILE-LOC-004 | File Mgmt | Medium | ✅ Implemented | ⏳ Pending |
+| REQ-FILE-LOC-005 | File Mgmt | Critical | ✅ Implemented | ✅ Tested |
 | REQ-AUD-LOC-001 | Audit | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-AUD-LOC-002 | Audit | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-AUD-LOC-003 | Audit | Critical | ⚠️ Partial | ⏳ Pending |

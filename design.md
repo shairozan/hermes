@@ -1054,6 +1054,16 @@ working_dir := "/workspace"
 - `output/*.xml` - All .xml files in output/ subdirectory
 - `FDATA` - Exact filename match
 - `**/*.png` - Recursive pattern (all PNG files in any subdirectory)
+- `output/**/*.json` - Recursive pattern scoped to a subtree (all JSON at any
+  depth under output/)
+
+Patterns are expanded with the `doublestar` library, giving full globstar
+(`**`) support. Both execution modes produce identical matches for a given
+pattern set (REQ-FILE-LOC-005):
+- **Local mode** globs directly over the workspace directory.
+- **Docker mode** copies the working directory out of the container as a tar
+  stream once and filters entries against the patterns (image-agnostic — no
+  shell or `find` required inside the container).
 
 **Example**:
 ```protobuf
