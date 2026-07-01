@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,9 +27,9 @@ type ServerConfig struct {
 
 // ExecutorConfig holds executor-specific configuration
 type ExecutorConfig struct {
-	Mode   string             `yaml:"mode"`   // "local", "docker", "file-server", "scheduler"
-	Local  LocalConfig        `yaml:"local"`
-	Docker DockerConfig       `yaml:"docker"`
+	Mode   string       `yaml:"mode"` // "local", "docker", "file-server", "scheduler"
+	Local  LocalConfig  `yaml:"local"`
+	Docker DockerConfig `yaml:"docker"`
 }
 
 // LocalConfig holds local executor configuration
@@ -43,9 +44,9 @@ type DockerConfig struct {
 
 // OverridesConfig holds command and path override configuration
 type OverridesConfig struct {
-	Commands    []CommandOverride    `yaml:"commands"`
-	RetainPaths []PathOverride       `yaml:"retain_paths"`
-	Environment map[string]string    `yaml:"environment"`
+	Commands    []CommandOverride `yaml:"commands"`
+	RetainPaths []PathOverride    `yaml:"retain_paths"`
+	Environment map[string]string `yaml:"environment"`
 }
 
 // CommandOverride defines a command path override
@@ -62,14 +63,15 @@ type PathOverride struct {
 	Description string `yaml:"description"`
 }
 
-// Match checks if the command matches the pattern and returns the target
+// Match checks if the command matches the pattern and returns the target.
+// Uses doublestar matching so patterns may contain globstars (**) in addition
+// to the standard filepath.Match syntax.
+// TODO: Implement capture-group substitution (e.g. $1) in Target.
 func (c *CommandOverride) Match(command string) (bool, string) {
-	// Simple glob matching for now
-	// TODO: Implement proper glob matching with capture groups
-	matched, err := filepath.Match(c.Pattern, command)
+	matched, err := doublestar.Match(c.Pattern, command)
 	if err != nil || !matched {
 		// Try matching against base name
-		matched, err = filepath.Match(c.Pattern, filepath.Base(command))
+		matched, err = doublestar.Match(c.Pattern, filepath.Base(command))
 		if err != nil || !matched {
 			return false, ""
 		}
@@ -78,11 +80,12 @@ func (c *CommandOverride) Match(command string) (bool, string) {
 	return true, c.Target
 }
 
-// Match checks if the path matches the pattern and returns the target
+// Match checks if the path matches the pattern and returns the target.
+// Uses doublestar matching so patterns may contain globstars (**), e.g.
+// "output/**/*.lst" matches "output/run1/final.lst".
+// TODO: Implement capture-group substitution (e.g. $1) in Target.
 func (p *PathOverride) Match(path string) (bool, string) {
-	// Simple glob matching for now
-	// TODO: Implement proper glob matching with capture groups
-	matched, err := filepath.Match(p.Pattern, path)
+	matched, err := doublestar.Match(p.Pattern, path)
 	if err != nil || !matched {
 		return false, ""
 	}
@@ -263,11 +266,16 @@ overrides:
       target: "/opt/NONMEM/nm75/run/nmfe75"
       description: "Redirect any nmfe75 to installed NONMEM 7.5"
 
-  # File path overrides for retained files
+  # File path overrides for retained files.
+  # Patterns support standard globbing plus globstar (**) for recursive matches.
   retain_paths:
     - pattern: "output/*"
       target: "/var/results/$1"
       description: "Map output directory to /var/results"
+
+    - pattern: "output/**/*.json"
+      target: "/var/results"
+      description: "Recursively match JSON artifacts at any depth under output/"
 
   # Environment variable injections
   environment:

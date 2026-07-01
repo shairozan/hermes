@@ -362,8 +362,8 @@ func TestLocalExecutorArtifactCollection(t *testing.T) {
 	// *.txt matches only root-level .txt files (result.txt)
 	// output/*.log matches only .log files in output/ directory (debug.log)
 	expectedFiles := map[string]bool{
-		"result.txt":       true,  // matches *.txt
-		"output/debug.log": true,  // matches output/*.log
+		"result.txt":       true, // matches *.txt
+		"output/debug.log": true, // matches output/*.log
 		// Note: output/log.txt is .txt but in subdirectory, won't match *.txt
 		// and won't match output/*.log because extension is .txt not .log
 	}
@@ -380,6 +380,79 @@ func TestLocalExecutorArtifactCollection(t *testing.T) {
 	}
 
 	// Verify file count
+	if filesCollected != int32(len(expectedFiles)) {
+		t.Errorf("File count mismatch. Expected: %d, Got: %d", len(expectedFiles), filesCollected)
+	}
+}
+
+// TestLocalExecutorGlobstarCollection validates REQ-FILE-LOC-005
+// Requirement: Recursive Glob Pattern Support
+// Priority: Critical
+// Category: GxP Critical
+// Description: Verifies globstar (**) retain patterns recursively match nested
+// workspace files, and that non-matching files are ignored.
+func TestLocalExecutorGlobstarCollection(t *testing.T) {
+	tempBase := t.TempDir()
+
+	exec, err := NewLocalExecutor(tempBase)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+
+	ctx := context.Background()
+
+	req := &executor.ExecutionRequest{
+		ExecutionID: "test-globstar",
+		Command:     "echo",
+		Args:        []string{"done"},
+		WorkingDir:  "/workspace",
+		Files: map[string][]byte{
+			"out/a.json":           []byte("a"),
+			"out/deep/b.json":      []byte("b"),
+			"out/deep/more/c.json": []byte("c"),
+			"out/deep/d.txt":       []byte("d"),
+			"top.json":             []byte("t"),
+		},
+		Retain:         []string{"out/**/*.json"},
+		ContainerImage: "",
+		Environment:    map[string]string{},
+		Limits:         nil,
+	}
+
+	events, err := exec.Execute(ctx, req)
+	if err != nil {
+		t.Fatalf("Failed to execute: %v", err)
+	}
+
+	collectedFiles := make(map[string]bool)
+	var filesCollected int32
+	for event := range events {
+		if event.Type == executor.EventFileChunk {
+			collectedFiles[event.Data.(*executor.FileChunkData).Path] = true
+		}
+		if event.Type == executor.EventComplete {
+			filesCollected = event.Data.(*executor.ExecutionCompleteData).FilesCollected
+		}
+	}
+
+	// out/**/*.json matches json files at any depth under out/, including
+	// directly in out/ (doublestar's ** matches zero or more path segments).
+	expectedFiles := map[string]bool{
+		"out/a.json":           true,
+		"out/deep/b.json":      true,
+		"out/deep/more/c.json": true,
+	}
+	for expected := range expectedFiles {
+		if !collectedFiles[expected] {
+			t.Errorf("Expected globstar match not collected: %s", expected)
+		}
+	}
+	if collectedFiles["out/deep/d.txt"] {
+		t.Error("out/deep/d.txt should not be collected (not .json)")
+	}
+	if collectedFiles["top.json"] {
+		t.Error("top.json should not be collected (outside out/)")
+	}
 	if filesCollected != int32(len(expectedFiles)) {
 		t.Errorf("File count mismatch. Expected: %d, Got: %d", len(expectedFiles), filesCollected)
 	}

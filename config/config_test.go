@@ -516,3 +516,36 @@ func TestConfigurationValidation(t *testing.T) {
 		}
 	})
 }
+
+// TestOverrideGlobstarMatch validates REQ-FILE-LOC-005 for config overrides:
+// override patterns support globstar (**) while remaining compatible with
+// existing single-star patterns.
+func TestOverrideGlobstarMatch(t *testing.T) {
+	t.Run("path_override_globstar", func(t *testing.T) {
+		p := PathOverride{Pattern: "output/**/*.lst", Target: "/var/results"}
+		if matched, target := p.Match("output/run1/final.lst"); !matched || target != "/var/results" {
+			t.Errorf("expected globstar match, got matched=%v target=%q", matched, target)
+		}
+		if matched, _ := p.Match("output/final.txt"); matched {
+			t.Error("expected no match for non-.lst path")
+		}
+	})
+
+	t.Run("path_override_single_star_unchanged", func(t *testing.T) {
+		p := PathOverride{Pattern: "output/*", Target: "/var/results"}
+		if matched, _ := p.Match("output/final.lst"); !matched {
+			t.Error("expected single-star match")
+		}
+		// Single star must not cross a path separator.
+		if matched, _ := p.Match("output/run1/final.lst"); matched {
+			t.Error("single-star pattern should not match nested path")
+		}
+	})
+
+	t.Run("command_override_globstar", func(t *testing.T) {
+		c := CommandOverride{Pattern: "bin/**/nonmem", Target: "/opt/nm/nonmem"}
+		if matched, target := c.Match("bin/v7/nonmem"); !matched || target != "/opt/nm/nonmem" {
+			t.Errorf("expected globstar command match, got matched=%v target=%q", matched, target)
+		}
+	})
+}
