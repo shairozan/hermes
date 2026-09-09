@@ -1,4 +1,4 @@
-module github.com/pharmalytica/hermes
+module github.com/shairozan/hermes
 
 go 1.25.0
 
