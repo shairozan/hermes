@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package hermes;
 
-option go_package = "github.com/pharmalytica/hermes/proto;hermespb";
+option go_package = "github.com/shairozan/hermes/proto;hermespb";
 
 service Hermes {
   // Execute a command in a container and stream results

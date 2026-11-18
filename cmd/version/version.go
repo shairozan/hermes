@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pharmalytica/hermes/version"
+	"github.com/shairozan/hermes/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

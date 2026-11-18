@@ -3,11 +3,11 @@ package server
 import (
 	"fmt"
 
-	"github.com/pharmalytica/hermes/audit"
-	"github.com/pharmalytica/hermes/config"
-	"github.com/pharmalytica/hermes/docker"
-	"github.com/pharmalytica/hermes/executor"
-	"github.com/pharmalytica/hermes/executor/local"
+	"github.com/shairozan/hermes/audit"
+	"github.com/shairozan/hermes/config"
+	"github.com/shairozan/hermes/docker"
+	"github.com/shairozan/hermes/executor"
+	"github.com/shairozan/hermes/executor/local"
 )
 
 // NewExecutor creates an executor based on the configuration

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/executor"
 )
 
 // TestLocalExecutorCommandExecution validates REQ-EXE-LOC-001

@@ -18,7 +18,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/executor"
 )
 
 // DockerExecutor implements the Executor interface using Docker

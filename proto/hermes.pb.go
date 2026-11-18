@@ -1231,7 +1231,7 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"\x06Cancel\x12\x15.hermes.CancelRequest\x1a\x16.hermes.CancelResponse\x127\n" +
 	"\x06Health\x12\x15.hermes.HealthRequest\x1a\x16.hermes.HealthResponse\x12=\n" +
 	"\n" +
-	"GetVersion\x12\x16.hermes.VersionRequest\x1a\x17.hermes.VersionResponseB/Z-github.com/pharmalytica/hermes/proto;hermespbb\x06proto3"
+	"GetVersion\x12\x16.hermes.VersionRequest\x1a\x17.hermes.VersionResponseB,Z*github.com/shairozan/hermes/proto;hermespbb\x06proto3"
 
 var (
 	file_proto_hermes_proto_rawDescOnce sync.Once

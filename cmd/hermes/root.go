@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pharmalytica/hermes/cmd/serve"
-	versionCmd "github.com/pharmalytica/hermes/cmd/version"
-	"github.com/pharmalytica/hermes/version"
+	"github.com/shairozan/hermes/cmd/serve"
+	versionCmd "github.com/shairozan/hermes/cmd/version"
+	"github.com/shairozan/hermes/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

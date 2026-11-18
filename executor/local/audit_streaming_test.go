@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/pharmalytica/hermes/audit"
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/audit"
+	"github.com/shairozan/hermes/executor"
 )
 
 // TestAuditLogStreaming verifies that audit logs are streamed to the client
