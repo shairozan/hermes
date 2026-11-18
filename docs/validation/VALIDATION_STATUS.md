@@ -20,6 +20,7 @@ This document tracks the validation status of Hermes functional requirements per
 | REQ-EXE-LOC-002 | Workspace Isolation | ✅ Complete | ✅ Passing | TestLocalExecutorWorkspaceIsolation |
 | REQ-EXE-LOC-003 | Execution ID Generation | ✅ Complete | ✅ Passing | TestLocalExecutorExecutionIDGeneration |
 | REQ-EXE-LOC-004 | Output Streaming | ✅ Complete | ✅ Passing | TestLocalExecutorOutputStreaming |
+| REQ-EXE-LOC-005 | Run Directory | ✅ Complete | ✅ Passing | TestRunDirectory*, TestResolveRunDirectoryAccepted, TestContainerRunDirectory, TestInjectionArchive*, TestExecutePassesRunDirectory, TestGetVersionReportsCapabilities |
 
 ### Local Mode - File Management (FILE-LOC)
 
@@ -38,6 +39,7 @@ This document tracks the validation status of Hermes functional requirements per
 | REQ-AUD-LOC-002 | Timestamping | ✅ Complete | ✅ Passing | TestLocalExecutorTimestamping |
 | REQ-AUD-LOC-003 | Command Traceability | ✅ Complete | ✅ Passing | TestCommandTraceability **NEW** |
 | REQ-AUD-LOC-004 | Execution Completion Recording | ✅ Complete | ✅ Passing | TestExecutionCompletionRecording **NEW** |
+| REQ-AUD-LOC-005 | Run Directory Audit | ✅ Complete | ✅ Passing | TestRunDirectoryAudit |
 
 ### Local Mode - Configuration (CFG-LOC)
 
@@ -53,6 +55,7 @@ This document tracks the validation status of Hermes functional requirements per
 |--------|-------------|----------------|-------------|-------|
 | REQ-SEC-LOC-001 | Command Execution Isolation | ✅ Complete | ✅ Passing | TestCommandExecutionIsolation |
 | REQ-SEC-LOC-002 | Path Sanitization | ✅ Complete | ✅ Passing | TestPathSanitizationEdgeCases **NEW** |
+| REQ-SEC-LOC-003 | Run Directory Containment | ✅ Complete | ✅ Passing | TestResolveRunDirectoryRejected, TestRunDirectoryRejectedBeforeSideEffects, TestRunDirectoryIsInjectedFile, TestContainerRunDirectoryRejected |
 
 ### Local Mode - Error Handling (ERR-LOC)
 
@@ -268,6 +271,7 @@ local_test.go:362: Expected file not collected: output/log.txt
 | 1.1 | 2025-01-25 | "Need Tests" phase complete - 7 new tests added | AI/Human Pair |
 | 1.2 | 2025-01-25 | Beta ready milestone achieved (74% validated) | AI/Human Pair |
 | 2.0 | 2025-10-25 | **PRODUCTION READY** - All 19 requirements implemented & tested | AI/Human Pair |
+| 2.1 | 2026-11-18 | Run directory: REQ-EXE-LOC-005, REQ-AUD-LOC-005, REQ-SEC-LOC-003 implemented & tested | AI/Human Pair |
 | 2.0 | 2025-10-25 | Added audit logging infrastructure (audit package) | AI/Human Pair |
 | 2.0 | 2025-10-25 | Implemented command traceability, error handling, graceful degradation | AI/Human Pair |
 | 2.0 | 2025-10-25 | Enhanced path sanitization with edge case testing | AI/Human Pair |

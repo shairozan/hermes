@@ -91,7 +91,7 @@ Use macros in environment variables and command arguments to reference injected 
 
 ### Fallback: Relative Paths
 
-You can also use simple relative paths, which are resolved relative to the working directory:
+You can also use simple relative paths, which are resolved relative to the directory the command starts in (the working directory, or the [run directory](#run-directory) when one is set):
 
 ```json
 {
@@ -102,6 +102,32 @@ You can also use simple relative paths, which are resolved relative to the worki
 ```
 
 However, **explicit macros are recommended** for clarity and compatibility with tools expecting absolute paths.
+
+## Run Directory
+
+`working_dir` is where injected files are placed and, by default, where the command starts. Set `run_directory` to start the command in a subdirectory of it instead. This lets a request carry a file layout rooted above the place the command runs, so references such as `../../data/x.csv` resolve.
+
+```json
+{
+  "command": "/opt/NONMEM/nm76/run/nmfe76",
+  "args": ["model.ctl", "model.lst"],
+  "working_dir": "/workspace",
+  "run_directory": "runs/1001",
+  "files": {
+    "runs/1001/model.ctl": "<base64 encoded content>",
+    "data/x.csv": "<base64 encoded content>"
+  },
+  "retain": ["**"]
+}
+```
+
+- The command starts in `/workspace/runs/1001`.
+- `files`, `retain`, returned file paths and `${WORKSPACE}` stay relative to `working_dir`, so the output above is returned as `runs/1001/model.lst`.
+- The value must be relative, use forward slashes, and contain no `..` segment. Invalid values fail with error code `INVALID_RUN_DIRECTORY` before anything is written or executed.
+- The directory is created if no injected file created it.
+- Leave it empty to start in `working_dir`.
+
+Servers that support this field list `run_directory` in the `capabilities` returned by `GetVersion`. Older servers ignore the field, so check before relying on it.
 
 ## Development
 

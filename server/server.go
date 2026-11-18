@@ -44,6 +44,7 @@ func (s *Server) Execute(req *pb.ExecutionRequest, stream pb.Hermes_ExecuteServe
 		Command:        command,
 		Args:           req.Args,
 		WorkingDir:     req.WorkingDir,
+		RunDirectory:   req.RunDirectory,
 		Files:          req.Files,
 		Retain:         retain,
 		ContainerImage: req.ContainerImage,
@@ -113,6 +114,7 @@ func (s *Server) GetVersion(ctx context.Context, req *pb.VersionRequest) (*pb.Ve
 		BuildDate:  info.BuildDate,
 		GoVersion:  info.GoVersion,
 		Platform:   info.Platform,
+		Capabilities: executor.Capabilities(),
 	}, nil
 }
 
@@ -248,6 +250,18 @@ func convertExecutionEvent(event *executor.ExecutionEvent) *pb.ExecutionEvent {
 			Error: &pb.ExecutionError{
 				Message:   data.Message,
 				ErrorCode: data.ErrorCode,
+			},
+		}
+
+	case executor.EventAuditLog:
+		data := event.Data.(*executor.AuditLogData)
+		pbEvent.Event = &pb.ExecutionEvent_AuditLog{
+			AuditLog: &pb.AuditLogEntry{
+				Timestamp:   data.Timestamp,
+				Level:       data.Level,
+				ExecutionId: data.ExecutionID,
+				Message:     data.Message,
+				DataJson:    data.DataJSON,
 			},
 		}
 	}
