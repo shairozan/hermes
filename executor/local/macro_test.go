@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/executor"
 )
 
 // TestMacroExpansion tests that workspace macros are expanded correctly

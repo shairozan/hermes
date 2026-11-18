@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -18,7 +19,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/executor"
 )
 
 // DockerExecutor implements the Executor interface using Docker
@@ -76,13 +77,17 @@ func (d *DockerExecutor) Execute(ctx context.Context, req *executor.ExecutionReq
 		}()
 
 		if err := d.executeContainer(execCtx, req, events); err != nil {
+			errorCode := "EXECUTION_FAILED"
+			if errors.Is(err, executor.ErrInvalidRunDirectory) {
+				errorCode = executor.ErrorCodeInvalidRunDirectory
+			}
 			d.sendEvent(execCtx, events, req.ExecutionID, executor.ExecutionEvent{
 				ExecutionID: req.ExecutionID,
 				Timestamp:   time.Now().Unix(),
 				Type:        executor.EventError,
 				Data: &executor.ExecutionErrorData{
 					Message:   err.Error(),
-					ErrorCode: "EXECUTION_FAILED",
+					ErrorCode: errorCode,
 				},
 			})
 		}
@@ -94,6 +99,16 @@ func (d *DockerExecutor) Execute(ctx context.Context, req *executor.ExecutionReq
 // executeContainer handles the full container lifecycle
 func (d *DockerExecutor) executeContainer(ctx context.Context, req *executor.ExecutionRequest, events chan<- executor.ExecutionEvent) error {
 	startTime := time.Now()
+
+	// Validate the run directory before any side effect: no image is pulled
+	// and no container created for a rejected request (REQ-SEC-LOC-003).
+	runDirectory, err := executor.ResolveRunDirectory(req.RunDirectory)
+	if err != nil {
+		return err
+	}
+	if _, err := containerRunDirectory(req); err != nil {
+		return err
+	}
 
 	// Pull image if needed
 	if err := d.pullImage(ctx, req.ContainerImage); err != nil {
@@ -130,7 +145,7 @@ func (d *DockerExecutor) executeContainer(ctx context.Context, req *executor.Exe
 	})
 
 	// Inject files into container
-	if err := d.injectFiles(ctx, containerID, req.WorkingDir, req.Files); err != nil {
+	if err := d.injectFiles(ctx, containerID, req.WorkingDir, req.Files, runDirectory); err != nil {
 		return fmt.Errorf("failed to inject files: %w", err)
 	}
 
@@ -229,11 +244,18 @@ func (d *DockerExecutor) createContainer(ctx context.Context, req *executor.Exec
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	// The command starts in the run directory (REQ-EXE-LOC-005). Macros above
+	// and file injection/collection remain relative to req.WorkingDir.
+	commandDir, err := containerRunDirectory(req)
+	if err != nil {
+		return "", err
+	}
+
 	// Create container config
 	containerConfig := &container.Config{
 		Image:      req.ContainerImage,
 		Cmd:        cmd,
-		WorkingDir: req.WorkingDir,
+		WorkingDir: commandDir,
 		Env:        env,
 		Tty:        false,
 	}
@@ -260,15 +282,46 @@ func (d *DockerExecutor) createContainer(ctx context.Context, req *executor.Exec
 	return resp.ID, nil
 }
 
-// injectFiles writes files into the container filesystem
-func (d *DockerExecutor) injectFiles(ctx context.Context, containerID, workingDir string, files map[string][]byte) error {
-	if len(files) == 0 {
-		return nil
+// containerRunDirectory returns the container path the command starts in: the
+// request's working directory joined with its validated run directory.
+func containerRunDirectory(req *executor.ExecutionRequest) (string, error) {
+	runDirectory, err := executor.ResolveRunDirectory(req.RunDirectory)
+	if err != nil {
+		return "", err
+	}
+	if runDirectory == "" {
+		return req.WorkingDir, nil
+	}
+	if req.WorkingDir == "" {
+		// Without a working directory the files root is the image default,
+		// which is unknown here, so the run directory cannot be made absolute.
+		return "", fmt.Errorf("%w %q: working_dir is required when run_directory is set", executor.ErrInvalidRunDirectory, runDirectory)
+	}
+	return path.Join(req.WorkingDir, runDirectory), nil
+}
+
+// buildInjectionArchive produces the tar stream copied into the working
+// directory. runDirectory must already be validated; when set, a directory
+// entry is added so that it exists even if no file is placed in it. A nil
+// buffer means there is nothing to inject.
+func buildInjectionArchive(files map[string][]byte, runDirectory string) (*bytes.Buffer, error) {
+	if len(files) == 0 && runDirectory == "" {
+		return nil, nil
 	}
 
-	// Create tar archive
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
+
+	if runDirectory != "" {
+		hdr := &tar.Header{
+			Name:     runDirectory + "/",
+			Mode:     0755,
+			Typeflag: tar.TypeDir,
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return nil, fmt.Errorf("failed to write tar header: %w", err)
+		}
+	}
 
 	for path, content := range files {
 		hdr := &tar.Header{
@@ -277,19 +330,33 @@ func (d *DockerExecutor) injectFiles(ctx context.Context, containerID, workingDi
 			Size: int64(len(content)),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
-			return fmt.Errorf("failed to write tar header: %w", err)
+			return nil, fmt.Errorf("failed to write tar header: %w", err)
 		}
 		if _, err := tw.Write(content); err != nil {
-			return fmt.Errorf("failed to write tar content: %w", err)
+			return nil, fmt.Errorf("failed to write tar content: %w", err)
 		}
 	}
 
 	if err := tw.Close(); err != nil {
-		return fmt.Errorf("failed to close tar writer: %w", err)
+		return nil, fmt.Errorf("failed to close tar writer: %w", err)
+	}
+
+	return &buf, nil
+}
+
+// injectFiles injects files into the container's working directory and ensures
+// the run directory exists.
+func (d *DockerExecutor) injectFiles(ctx context.Context, containerID, workingDir string, files map[string][]byte, runDirectory string) error {
+	archive, err := buildInjectionArchive(files, runDirectory)
+	if err != nil {
+		return err
+	}
+	if archive == nil {
+		return nil
 	}
 
 	// Copy tar into container
-	err := d.client.CopyToContainer(ctx, containerID, workingDir, &buf, container.CopyToContainerOptions{})
+	err = d.client.CopyToContainer(ctx, containerID, workingDir, archive, container.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to copy files to container: %w", err)
 	}

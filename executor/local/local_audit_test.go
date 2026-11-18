@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pharmalytica/hermes/audit"
-	"github.com/pharmalytica/hermes/config"
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/audit"
+	"github.com/shairozan/hermes/config"
+	"github.com/shairozan/hermes/executor"
 )
 
 // TestCommandTraceability validates REQ-AUD-LOC-003

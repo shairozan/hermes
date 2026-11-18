@@ -54,7 +54,14 @@ type ExecutionRequest struct {
 	// If empty, server generates a UUID
 	// Client should provide this to align with audit log entries
 	// Example: "audit-entry-12345" or "janus-job-abc-def"
-	ExecutionId   string `protobuf:"bytes,9,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	ExecutionId string `protobuf:"bytes,9,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	// Directory in which the command starts, relative to working_dir.
+	// Uses forward slashes. Empty means working_dir itself.
+	// files, retain, FileChunk.path and ${WORKSPACE} are unaffected: they
+	// remain relative to working_dir. Absolute paths, backslashes and ".."
+	// segments are rejected with error code INVALID_RUN_DIRECTORY.
+	// Example: "runs/1001"
+	RunDirectory  string `protobuf:"bytes,10,opt,name=run_directory,json=runDirectory,proto3" json:"run_directory,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,6 +155,13 @@ func (x *ExecutionRequest) GetLimits() *ResourceLimits {
 func (x *ExecutionRequest) GetExecutionId() string {
 	if x != nil {
 		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *ExecutionRequest) GetRunDirectory() string {
+	if x != nil {
+		return x.RunDirectory
 	}
 	return ""
 }
@@ -1066,7 +1080,12 @@ type VersionResponse struct {
 	// Go version used to build
 	GoVersion string `protobuf:"bytes,4,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
 	// Platform (e.g., "linux/amd64", "windows/amd64")
-	Platform      string `protobuf:"bytes,5,opt,name=platform,proto3" json:"platform,omitempty"`
+	Platform string `protobuf:"bytes,5,opt,name=platform,proto3" json:"platform,omitempty"`
+	// Optional request features this server implements.
+	// Clients should check this before relying on a feature, because servers
+	// silently ignore request fields they do not know.
+	// Example: ["run_directory"]
+	Capabilities  []string `protobuf:"bytes,6,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1136,11 +1155,18 @@ func (x *VersionResponse) GetPlatform() string {
 	return ""
 }
 
+func (x *VersionResponse) GetCapabilities() []string {
+	if x != nil {
+		return x.Capabilities
+	}
+	return nil
+}
+
 var File_proto_hermes_proto protoreflect.FileDescriptor
 
 const file_proto_hermes_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/hermes.proto\x12\x06hermes\"\xf7\x03\n" +
+	"\x12proto/hermes.proto\x12\x06hermes\"\x9c\x04\n" +
 	"\x10ExecutionRequest\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x12\n" +
 	"\x04args\x18\x02 \x03(\tR\x04args\x12\x1f\n" +
@@ -1151,7 +1177,9 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"\x0fcontainer_image\x18\x06 \x01(\tR\x0econtainerImage\x12K\n" +
 	"\venvironment\x18\a \x03(\v2).hermes.ExecutionRequest.EnvironmentEntryR\venvironment\x12.\n" +
 	"\x06limits\x18\b \x01(\v2\x16.hermes.ResourceLimitsR\x06limits\x12!\n" +
-	"\fexecution_id\x18\t \x01(\tR\vexecutionId\x1a8\n" +
+	"\fexecution_id\x18\t \x01(\tR\vexecutionId\x12#\n" +
+	"\rrun_directory\x18\n" +
+	" \x01(\tR\frunDirectory\x1a8\n" +
 	"\n" +
 	"FilesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -1216,7 +1244,7 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"\fDockerStatus\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\"\x10\n" +
-	"\x0eVersionRequest\"\xa4\x01\n" +
+	"\x0eVersionRequest\"\xc8\x01\n" +
 	"\x0fVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x1d\n" +
 	"\n" +
@@ -1225,13 +1253,14 @@ const file_proto_hermes_proto_rawDesc = "" +
 	"build_date\x18\x03 \x01(\tR\tbuildDate\x12\x1d\n" +
 	"\n" +
 	"go_version\x18\x04 \x01(\tR\tgoVersion\x12\x1a\n" +
-	"\bplatform\x18\x05 \x01(\tR\bplatform2\xf8\x01\n" +
+	"\bplatform\x18\x05 \x01(\tR\bplatform\x12\"\n" +
+	"\fcapabilities\x18\x06 \x03(\tR\fcapabilities2\xf8\x01\n" +
 	"\x06Hermes\x12=\n" +
 	"\aExecute\x12\x18.hermes.ExecutionRequest\x1a\x16.hermes.ExecutionEvent0\x01\x127\n" +
 	"\x06Cancel\x12\x15.hermes.CancelRequest\x1a\x16.hermes.CancelResponse\x127\n" +
 	"\x06Health\x12\x15.hermes.HealthRequest\x1a\x16.hermes.HealthResponse\x12=\n" +
 	"\n" +
-	"GetVersion\x12\x16.hermes.VersionRequest\x1a\x17.hermes.VersionResponseB/Z-github.com/pharmalytica/hermes/proto;hermespbb\x06proto3"
+	"GetVersion\x12\x16.hermes.VersionRequest\x1a\x17.hermes.VersionResponseB,Z*github.com/shairozan/hermes/proto;hermespbb\x06proto3"
 
 var (
 	file_proto_hermes_proto_rawDescOnce sync.Once

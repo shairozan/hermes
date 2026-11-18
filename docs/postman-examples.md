@@ -111,6 +111,36 @@ The base64 string decodes to: "This is a test file injected by Hermes!"
 
 ---
 
+## Test with a Run Directory
+
+This places a data file above the directory the command starts in, then reads it by a parent-relative path:
+
+```json
+{
+  "command": "bash",
+  "args": ["-c", "pwd && cat ../../data/x.csv && cp ../../data/x.csv out.txt"],
+  "working_dir": "/workspace",
+  "run_directory": "runs/1001",
+  "files": {
+    "data/x.csv": "SUQsRFYK"
+  },
+  "retain": ["**"],
+  "execution_id": "test-run-directory"
+}
+```
+
+**File Content Decoded:**
+The base64 string decodes to: "ID,DV"
+
+**Expected Output:**
+- A working directory ending in `/workspace/runs/1001`
+- `ID,DV` printed
+- `runs/1001/out.txt` and `data/x.csv` returned
+
+Setting `"run_directory": "../outside"` instead returns an error event with code `INVALID_RUN_DIRECTORY` and executes nothing.
+
+---
+
 ## Test with Resource Limits
 
 ```json

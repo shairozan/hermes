@@ -111,6 +111,14 @@ message ExecutionRequest {
   // Client should provide this to align with audit log entries
   // Example: "audit-entry-12345" or "janus-job-abc-def"
   string execution_id = 9;
+
+  // Directory in which the command starts, relative to working_dir.
+  // Uses forward slashes. Empty means working_dir itself.
+  // files, retain, FileChunk.path and ${WORKSPACE} are unaffected: they
+  // remain relative to working_dir. Absolute paths, backslashes and ".."
+  // segments are rejected with error code INVALID_RUN_DIRECTORY.
+  // Example: "runs/1001"
+  string run_directory = 10;
 }
 
 message ResourceLimits {
@@ -1019,7 +1027,8 @@ While maintaining:
 3. For each file in map:
    - Write bytes to container filesystem at `working_dir + "/" + key`
    - Preserve any directory structure in the key (e.g., `"data/input.csv"`)
-4. Set working directory to `working_dir`
+4. Set the command's directory to `working_dir`, or to
+   `working_dir + "/" + run_directory` when the request names a run directory
 5. Execute command
 
 **Example**:
@@ -1036,6 +1045,56 @@ working_dir := "/workspace"
 // /workspace/data/input.csv
 // /workspace/licenses/nonmem.lic
 ```
+
+### Run Directory
+
+`working_dir` is where files are placed. By default it is also where the
+command starts. `run_directory` separates the two: it names the directory the
+command starts in, relative to `working_dir`.
+
+This exists because injected paths cannot be absolute or contain `..`, so every
+file must sit at or below `working_dir`. A command that refers to a file above
+its own directory can only be reproduced if the file layout is rooted higher
+than the place the command runs.
+
+**Example**:
+```go
+files := map[string][]byte{
+    "runs/1001/model.ctl": modelBytes, // contains: $DATA ../../data/x.csv
+    "data/x.csv":          dataBytes,
+}
+working_dir   := "/workspace"
+run_directory := "runs/1001"
+
+// Files:   /workspace/runs/1001/model.ctl
+//          /workspace/data/x.csv
+// Command starts in /workspace/runs/1001, so ../../data/x.csv resolves.
+// Outputs are returned relative to working_dir: runs/1001/model.lst
+```
+
+**Rules**:
+- Empty means `working_dir` itself (the behavior before this field existed).
+- The value is validated before any file is written or container created.
+  Absolute paths, drive prefixes, backslashes, NUL bytes, `..` segments, and
+  values over 4096 bytes are rejected. Segments are compared whole, so `a..b`
+  is a legal name. The value is then cleaned (`./runs/1001/` → `runs/1001`).
+- The directory is created if no injected file created it. A path that exists
+  as a file is rejected.
+- `files`, `retain`, `FileChunk.path`, `${WORKSPACE}` and `${WORKSPACE_ROOT}`
+  keep referring to `working_dir`.
+- Relative paths in arguments resolve against the run directory, as for any
+  process started there.
+- Failures use error code `INVALID_RUN_DIRECTORY`.
+- The execution-start audit entry records `run_directory` (`.` when the
+  command starts in `working_dir`) and the absolute `working_directory`.
+
+**Capability discovery**: servers ignore request fields they do not know, so a
+server without this feature would start the command in `working_dir` without
+reporting an error. `GetVersion` returns a `capabilities` list; a server that
+honors the field includes `run_directory`. Clients that depend on it should
+check before executing.
+
+Requirements: REQ-EXE-LOC-005, REQ-SEC-LOC-003, REQ-AUD-LOC-005.
 
 ### File Collection (Retention)
 
@@ -1366,7 +1425,7 @@ To reference injected files in environment variables and command arguments witho
 
 **Fallback Behavior**:
 If a path doesn't use macros, Hermes treats it as follows:
-- **Relative paths**: Resolved relative to the workspace (working directory)
+- **Relative paths**: Resolved relative to the directory the command starts in: the workspace (working directory), or the run directory when one is set
 - **Absolute paths**: Used as-is (but may fail if path doesn't exist)
 
 **Example - Relative Path Fallback**:

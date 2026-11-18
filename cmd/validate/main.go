@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pharmalytica/hermes/validation"
+	"github.com/shairozan/hermes/validation"
 )
 
 func main() {

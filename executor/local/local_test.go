@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/executor"
 )
 
 // TestLocalExecutorWorkspaceIsolation validates REQ-EXE-LOC-002

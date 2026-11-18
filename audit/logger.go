@@ -133,11 +133,16 @@ func (l *Logger) AuditCommandOverride(executionID string, override CommandOverri
 	l.Audit(executionID, "Command override applied", data)
 }
 
-// AuditExecution logs the start of an execution
-func (l *Logger) AuditExecution(executionID, command string, args []string) {
+// AuditExecution logs the start of an execution, including where the command
+// starts (REQ-AUD-LOC-005). runDirectory is relative to the request's working
+// directory ("." when the command starts there); workingDirectory is the
+// absolute directory the command starts in.
+func (l *Logger) AuditExecution(executionID, command string, args []string, runDirectory, workingDirectory string) {
 	data := map[string]interface{}{
-		"command": command,
-		"args":    args,
+		"command":           command,
+		"args":              args,
+		"run_directory":     runDirectory,
+		"working_directory": workingDirectory,
 	}
 	l.Audit(executionID, "Execution started", data)
 }

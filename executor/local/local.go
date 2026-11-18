@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,9 +16,9 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/google/uuid"
-	"github.com/pharmalytica/hermes/audit"
-	"github.com/pharmalytica/hermes/config"
-	"github.com/pharmalytica/hermes/executor"
+	"github.com/shairozan/hermes/audit"
+	"github.com/shairozan/hermes/config"
+	"github.com/shairozan/hermes/executor"
 )
 
 // LocalExecutor executes commands directly on the host filesystem
@@ -73,13 +74,17 @@ func (l *LocalExecutor) Execute(ctx context.Context, req *executor.ExecutionRequ
 		defer close(events)
 
 		if err := l.executeLocal(ctx, req, events); err != nil {
+			errorCode := "EXECUTION_FAILED"
+			if errors.Is(err, executor.ErrInvalidRunDirectory) {
+				errorCode = executor.ErrorCodeInvalidRunDirectory
+			}
 			l.sendEvent(ctx, events, req.ExecutionID, executor.ExecutionEvent{
 				ExecutionID: req.ExecutionID,
 				Timestamp:   time.Now().Unix(),
 				Type:        executor.EventError,
 				Data: &executor.ExecutionErrorData{
 					Message:   err.Error(),
-					ErrorCode: "EXECUTION_FAILED",
+					ErrorCode: errorCode,
 				},
 			})
 		}
@@ -137,6 +142,14 @@ func expandArgsMacros(args []string, workspacePath string) []string {
 
 // executeLocal handles the full local execution lifecycle
 func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.ExecutionRequest, events chan<- executor.ExecutionEvent) error {
+	// Validate the run directory before any side effect: no workspace, file,
+	// or process may exist for a rejected request (REQ-SEC-LOC-003).
+	runDirectory, err := executor.ResolveRunDirectory(req.RunDirectory)
+	if err != nil {
+		l.logger.Error(req.ExecutionID, "Run directory rejected", err)
+		return err
+	}
+
 	// Create a child context for this execution that we control
 	// This ensures all goroutines spawned for this execution can be properly cancelled
 	execCtx, cancel := context.WithCancel(ctx)
@@ -208,8 +221,20 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	expandedArgs := expandArgsMacros(req.Args, workingDir)
 	expandedEnv := expandEnvironmentMacros(req.Environment, workingDir)
 
-	// Audit execution start
-	l.logger.AuditExecution(req.ExecutionID, actualCommand, expandedArgs)
+	// Prepare the directory the command starts in (REQ-EXE-LOC-005). Files,
+	// retain patterns and macros above remain relative to workingDir.
+	commandDir, err := prepareRunDirectory(workingDir, runDirectory)
+	if err != nil {
+		l.logger.Error(req.ExecutionID, "Run directory preparation failed", err)
+		return err
+	}
+
+	// Audit execution start (REQ-AUD-LOC-005)
+	auditRunDirectory := runDirectory
+	if auditRunDirectory == "" {
+		auditRunDirectory = "."
+	}
+	l.logger.AuditExecution(req.ExecutionID, actualCommand, expandedArgs, auditRunDirectory, commandDir)
 	if !overridden {
 		// Also log original command if no override
 		l.logger.InfoWithData(req.ExecutionID, "Executing command", map[string]interface{}{
@@ -220,7 +245,7 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 
 	// Execute command using execution context
 	cmd := exec.CommandContext(execCtx, actualCommand, expandedArgs...)
-	cmd.Dir = workingDir
+	cmd.Dir = commandDir
 
 	// Set environment variables (with expanded macros)
 	cmd.Env = os.Environ()
@@ -327,6 +352,37 @@ func (l *LocalExecutor) executeLocal(ctx context.Context, req *executor.Executio
 	cancel()
 
 	return nil
+}
+
+// prepareRunDirectory returns the directory the command starts in. runDirectory
+// must already be validated by executor.ResolveRunDirectory; empty means
+// workingDir. The directory is created when no injected file created it, and
+// its resolved location is confirmed to lie inside workingDir.
+func prepareRunDirectory(workingDir, runDirectory string) (string, error) {
+	if runDirectory == "" {
+		return workingDir, nil
+	}
+
+	commandDir := filepath.Join(workingDir, filepath.FromSlash(runDirectory))
+	if err := os.MkdirAll(commandDir, 0755); err != nil {
+		return "", fmt.Errorf("%w %q: %v", executor.ErrInvalidRunDirectory, runDirectory, err)
+	}
+
+	// Second containment check on the resolved path, not only on the string.
+	resolvedRoot, err := filepath.EvalSymlinks(workingDir)
+	if err != nil {
+		return "", fmt.Errorf("%w %q: %v", executor.ErrInvalidRunDirectory, runDirectory, err)
+	}
+	resolvedDir, err := filepath.EvalSymlinks(commandDir)
+	if err != nil {
+		return "", fmt.Errorf("%w %q: %v", executor.ErrInvalidRunDirectory, runDirectory, err)
+	}
+	rel, err := filepath.Rel(resolvedRoot, resolvedDir)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("%w %q: resolves outside the working directory", executor.ErrInvalidRunDirectory, runDirectory)
+	}
+
+	return commandDir, nil
 }
 
 // writeFiles writes files from the request to the filesystem

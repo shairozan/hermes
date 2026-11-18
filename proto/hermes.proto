@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package hermes;
 
-option go_package = "github.com/pharmalytica/hermes/proto;hermespb";
+option go_package = "github.com/shairozan/hermes/proto;hermespb";
 
 service Hermes {
   // Execute a command in a container and stream results
@@ -59,6 +59,14 @@ message ExecutionRequest {
   // Client should provide this to align with audit log entries
   // Example: "audit-entry-12345" or "janus-job-abc-def"
   string execution_id = 9;
+
+  // Directory in which the command starts, relative to working_dir.
+  // Uses forward slashes. Empty means working_dir itself.
+  // files, retain, FileChunk.path and ${WORKSPACE} are unaffected: they
+  // remain relative to working_dir. Absolute paths, backslashes and ".."
+  // segments are rejected with error code INVALID_RUN_DIRECTORY.
+  // Example: "runs/1001"
+  string run_directory = 10;
 }
 
 message ResourceLimits {
@@ -198,4 +206,10 @@ message VersionResponse {
 
   // Platform (e.g., "linux/amd64", "windows/amd64")
   string platform = 5;
+
+  // Optional request features this server implements.
+  // Clients should check this before relying on a feature, because servers
+  // silently ignore request fields they do not know.
+  // Example: ["run_directory"]
+  repeated string capabilities = 6;
 }

@@ -28,6 +28,11 @@ type ExecutionRequest struct {
 	ContainerImage string
 	Environment    map[string]string
 	Limits         *ResourceLimits
+
+	// RunDirectory is where the command starts, relative to WorkingDir.
+	// Empty means WorkingDir itself. Files, Retain and workspace macros stay
+	// relative to WorkingDir. Validate with ResolveRunDirectory.
+	RunDirectory string
 }
 
 // ResourceLimits defines resource constraints for execution

@@ -144,6 +144,27 @@ Provides immediate feedback and enables monitoring of long-running executions.
 
 ---
 
+#### REQ-EXE-LOC-005: Run Directory
+**Priority**: High
+**GAMP Category**: GxP Critical
+
+**Requirement**:
+The system SHALL start the command in the directory named by `run_directory`, relative to the working directory, when the request provides one.
+
+**Rationale**:
+Allows a client to supply a file layout rooted above the directory in which the command runs, so that relative references between files are preserved.
+
+**Acceptance Criteria**:
+- Empty `run_directory` starts the command in the working directory
+- Non-empty `run_directory` starts the command in that subdirectory
+- Run directory is created when no injected file created it
+- Files, retain patterns, returned paths and workspace macros remain relative to the working directory
+
+**Test Strategy**: Inject files above and below the run directory, run a command that reads a parent-relative path and writes an output, verify content and returned path
+**Risk**: Medium - A command started in the wrong directory reads or writes the wrong files
+
+---
+
 ### FILE-LOC: Local File Management
 
 #### REQ-FILE-LOC-001: File Injection
@@ -383,6 +404,29 @@ Provides definitive record of execution outcome.
 
 ---
 
+#### REQ-AUD-LOC-005: Run Directory Audit
+**Priority**: High
+**GAMP Category**: GxP Critical
+
+**Requirement**:
+The system SHALL record the requested run directory and the absolute directory in which the command started in the execution-start audit entry.
+
+**Rationale**:
+The audit trail must state where a command ran without reference to the original request.
+
+**Acceptance Criteria**:
+- Execution-start audit entry contains `run_directory`
+- Execution-start audit entry contains `working_directory` as an absolute path
+- Both are present when `run_directory` is empty
+- Rejected `run_directory` values produce an `ERROR` audit entry
+
+**Test Strategy**: Inspect audit entries for executions with and without `run_directory`
+**Risk**: Medium - Execution location must be reconstructable
+
+**CFR 21 Part 11 Link**: §11.10(e) - Audit trails
+
+---
+
 ### CFG-LOC: Configuration (Local Mode)
 
 #### REQ-CFG-LOC-001: Mode Selection
@@ -496,6 +540,27 @@ Prevents unauthorized file access or modification.
 
 **Test Strategy**: See REQ-FILE-LOC-002
 **Risk**: Critical - Data integrity and security
+
+---
+
+#### REQ-SEC-LOC-003: Run Directory Containment
+**Priority**: Critical
+**GAMP Category**: GxP Critical
+
+**Requirement**:
+The system SHALL reject a `run_directory` that is absolute, contains a parent-directory segment, or resolves outside the working directory.
+
+**Rationale**:
+Prevents a request from starting a command outside its isolated workspace.
+
+**Acceptance Criteria**:
+- Absolute paths, drive prefixes, backslashes, NUL bytes and `..` segments are rejected
+- Rejection occurs before any file is written or container created
+- No command is executed for a rejected request
+- Error code `INVALID_RUN_DIRECTORY` is returned
+
+**Test Strategy**: Table-driven test of invalid values; verify no workspace content and no process started
+**Risk**: Critical - Workspace isolation
 
 ---
 
@@ -652,6 +717,7 @@ Per CLAUDE.md: "Boundaries for most testing should limit to 'Are we calling the 
 | REQ-EXE-LOC-002 | Execution | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-EXE-LOC-003 | Execution | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-EXE-LOC-004 | Execution | Critical | ✅ Implemented | ⏳ Pending |
+| REQ-EXE-LOC-005 | Execution | High | ✅ Implemented | ✅ Tested |
 | REQ-FILE-LOC-001 | File Mgmt | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-FILE-LOC-002 | Security | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-FILE-LOC-003 | File Mgmt | Critical | ✅ Implemented | ⏳ Pending |
@@ -661,11 +727,13 @@ Per CLAUDE.md: "Boundaries for most testing should limit to 'Are we calling the 
 | REQ-AUD-LOC-002 | Audit | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-AUD-LOC-003 | Audit | Critical | ⚠️ Partial | ⏳ Pending |
 | REQ-AUD-LOC-004 | Audit | Critical | ✅ Implemented | ⏳ Pending |
+| REQ-AUD-LOC-005 | Audit | High | ✅ Implemented | ✅ Tested |
 | REQ-CFG-LOC-001 | Config | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-CFG-LOC-002 | Config | Medium | ✅ Implemented | ⏳ Pending |
 | REQ-CFG-LOC-003 | Config | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-SEC-LOC-001 | Security | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-SEC-LOC-002 | Security | Critical | ✅ Implemented | ⏳ Pending |
+| REQ-SEC-LOC-003 | Security | Critical | ✅ Implemented | ✅ Tested |
 | REQ-ERR-LOC-001 | Error | Critical | ✅ Implemented | ⏳ Pending |
 | REQ-ERR-LOC-002 | Error | Medium | ✅ Implemented | ⏳ Pending |
 | REQ-FILE-SRV-001 | File Server | Critical | ❌ Future | ❌ N/A |
@@ -733,6 +801,7 @@ jobs:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2025-01-25 | AI/Human Pair | Initial requirements for local and file-server modes |
+| 1.1 | 2026-11-18 | AI/Human Pair | Added run directory requirements: REQ-EXE-LOC-005, REQ-AUD-LOC-005, REQ-SEC-LOC-003 |
 
 ---
 

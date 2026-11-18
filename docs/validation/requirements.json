@@ -98,6 +98,26 @@
       "test_status": "pending"
     },
     {
+      "id": "REQ-EXE-LOC-005",
+      "title": "Run Directory",
+      "category": "EXE",
+      "priority": "High",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL start the command in the directory named by run_directory, relative to the working directory, when the request provides one.",
+      "rationale": "Allows a client to supply a file layout rooted above the directory in which the command runs, so that relative references between files are preserved.",
+      "acceptance_criteria": [
+        "Empty run_directory starts the command in the working directory",
+        "Non-empty run_directory starts the command in that subdirectory",
+        "Run directory is created when no injected file created it",
+        "Files, retain patterns, returned paths and workspace macros remain relative to the working directory"
+      ],
+      "test_strategy": "Inject files above and below the run directory, run a command that reads a parent-relative path and writes an output, verify content and returned path",
+      "risk": "Medium",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "passing"
+    },
+    {
       "id": "REQ-FILE-LOC-001",
       "title": "File Injection",
       "category": "FILE",
@@ -256,6 +276,26 @@
       "test_status": "pending"
     },
     {
+      "id": "REQ-AUD-LOC-005",
+      "title": "Run Directory Audit",
+      "category": "AUD",
+      "priority": "High",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL record the requested run directory and the absolute directory in which the command started in the execution-start audit entry.",
+      "rationale": "The audit trail must state where a command ran without reference to the original request.",
+      "acceptance_criteria": [
+        "Execution-start audit entry contains run_directory",
+        "Execution-start audit entry contains working_directory as an absolute path",
+        "Both are present when run_directory is empty",
+        "Rejected run_directory values produce an ERROR audit entry"
+      ],
+      "test_strategy": "Inspect audit entries for executions with and without run_directory",
+      "risk": "Medium",
+      "cfr_link": "§11.10(e)",
+      "implementation_status": "implemented",
+      "test_status": "passing"
+    },
+    {
       "id": "REQ-CFG-LOC-001",
       "title": "Mode Selection",
       "category": "CFG",
@@ -354,6 +394,26 @@
       "cfr_link": null,
       "implementation_status": "implemented",
       "test_status": "pending"
+    },
+    {
+      "id": "REQ-SEC-LOC-003",
+      "title": "Run Directory Containment",
+      "category": "SEC",
+      "priority": "Critical",
+      "gamp_category": "GxP Critical",
+      "description": "The system SHALL reject a run_directory that is absolute, contains a parent-directory segment, or resolves outside the working directory.",
+      "rationale": "Prevents a request from starting a command outside its isolated workspace.",
+      "acceptance_criteria": [
+        "Absolute paths, drive prefixes, backslashes, NUL bytes and '..' segments are rejected",
+        "Rejection occurs before any file is written or container created",
+        "No command is executed for a rejected request",
+        "Error code INVALID_RUN_DIRECTORY is returned"
+      ],
+      "test_strategy": "Table-driven test of invalid values; verify no workspace content and no process started",
+      "risk": "Critical",
+      "cfr_link": null,
+      "implementation_status": "implemented",
+      "test_status": "passing"
     },
     {
       "id": "REQ-ERR-LOC-001",
